@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oregon Foods — Control de Tiempos</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface2: #f0faf4;
+    --border: #b2dfc5;
+    --field-bg: #e8f7ee;
+    --accent: #1a7a3f;
+    --accent2: #22a05a;
+    --accent3: #2563eb;
+    --danger: #dc2626;
+    --text: #1a2e1f;
+    --text-dim: #5a7a65;
+    --text-bright: #0f1f14;
+    --header-bg: #1a7a3f;
+    --header-border: #145f30;
+    --mono: 'Share Tech Mono', monospace; --sans: 'Barlow Condensed', sans-serif; --body: 'Barlow', sans-serif;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#f4faf6; color:var(--text); font-family:var(--body); min-height:100vh; overflow-x:hidden; }
+
+  /* Floating nav buttons — visible only when layout is side-by-side and screen is narrow */
+  .panel-nav { display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:150; background:#fff; border:1.5px solid var(--border); border-radius:40px; padding:6px 8px; display:flex; gap:6px; box-shadow:0 4px 20px rgba(26,122,63,.18); }
+  .btn-nav { padding:9px 20px; border:none; border-radius:30px; font-family:var(--sans); font-weight:700; font-size:13px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all .2s; white-space:nowrap; }
+  .btn-nav.active { background:var(--accent); color:#fff; }
+  .btn-nav:not(.active) { background:transparent; color:var(--text-dim); }
+  .btn-nav:not(.active):hover { background:var(--field-bg); color:var(--text); }
+  @media(min-width:1151px){ .panel-nav { display:none !important; } }
+  @media(max-width:1150px){ .panel-nav { display:flex; } }
+
+  header { background:var(--header-bg); border-bottom:3px solid var(--header-border); padding:0 32px; display:flex; align-items:center; justify-content:space-between; height:64px; position:sticky; top:0; z-index:100; box-shadow:0 2px 12px rgba(26,122,63,.2); }
+  .logo { display:flex; align-items:center; gap:14px; }
+  .logo-icon { width:36px; height:36px; background:#fff; display:flex; align-items:center; justify-content:center; clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
+  .logo-icon svg { width:20px; height:20px; fill:var(--accent); }
+  .logo-text { font-family:var(--sans); font-weight:900; font-size:20px; letter-spacing:2px; color:#ffffff; text-transform:uppercase; }
+  .logo-sub { font-family:var(--mono); font-size:10px; color:rgba(255,255,255,.7); letter-spacing:3px; text-transform:uppercase; margin-top:-2px; }
+  #live-clock { font-family:var(--mono); font-size:22px; color:#ffffff; letter-spacing:2px; }
+  .date-label { font-family:var(--mono); font-size:11px; color:rgba(255,255,255,.65); text-transform:uppercase; letter-spacing:1px; }
+
+  main { max-width:1500px; margin:0 auto; padding:28px 32px; display:grid; grid-template-columns:440px 1fr; gap:28px; align-items:start; }
+
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(26,122,63,.08); }
+  .panel-header { padding:14px 20px; background:var(--surface2); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .panel-header-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 6px var(--accent); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
+  .panel-title { font-family:var(--sans); font-weight:700; font-size:14px; letter-spacing:3px; text-transform:uppercase; color:var(--text-bright); }
+
+  .form-body { padding:20px; display:flex; flex-direction:column; gap:14px; }
+  .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field { display:flex; flex-direction:column; gap:5px; }
+  .field label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+  .field-hint { font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1px; min-height:13px; }
+  .field-hint.ok { color:var(--accent2); }
+
+  .field input, .field select {
+    background:var(--field-bg); border:1px solid var(--border); color:var(--text);
+    font-family:var(--mono); font-size:13px; padding:10px 12px; border-radius:5px;
+    outline:none; transition:border-color .2s, box-shadow .2s; width:100%;
+    appearance:none; -webkit-appearance:none;
+  }
+  .field input[type="date"], .field input[type="time"] { color-scheme:light; cursor:pointer; letter-spacing:1px; }
+  .field select {
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235a7a65' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; cursor:pointer;
+  }
+  .field input:focus, .field select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(26,122,63,.12); background:#d4f0e0; }
+  .field input::placeholder { color:var(--text-dim); }
+  .field select:disabled { opacity:.4; cursor:not-allowed; background:#f5f5f5; }
+
+  .divider { height:1px; background:var(--border); margin:2px 0; }
+  .section-label { font-family:var(--mono); font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--accent); padding:2px 0 4px; font-weight:bold; }
+
+  .timer-group { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .time-display { background:var(--field-bg); border:1px solid var(--border); border-radius:5px; padding:10px 12px; font-family:var(--mono); font-size:13px; color:var(--text-dim); display:flex; align-items:center; }
+  .time-display.filled { color:var(--accent); border-color:var(--accent); font-weight:bold; background:#d4f0e0; }
+  .btn-time { padding:10px 12px; border:none; border-radius:5px; font-family:var(--sans); font-weight:700; font-size:13px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .btn-start { background:#d4f0e0; color:var(--accent); border:1.5px solid var(--accent2); }
+  .btn-start:hover { background:#bee8d0; box-shadow:0 2px 8px rgba(26,122,63,.15); }
+  .btn-end { background:#fde8e8; color:var(--danger); border:1.5px solid var(--danger); }
+  .btn-end:hover { background:#fdd0d0; }
+
+  .time-mode-toggle { display:flex; gap:0; border:1.5px solid var(--border); border-radius:5px; overflow:hidden; }
+  .btn-mode { flex:1; padding:9px 12px; background:transparent; border:none; color:var(--text-dim); font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all .15s; }
+  .btn-mode.active { background:var(--accent); color:#fff; }
+  .btn-mode:not(.active):hover { background:var(--field-bg); color:var(--text); }
+
+  .duration-badge { background:var(--surface2); border:1.5px solid var(--border); border-radius:5px; padding:10px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .duration-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+  .duration-value { font-family:var(--mono); font-size:18px; color:var(--accent); letter-spacing:2px; font-weight:bold; }
+
+  .btn-submit { width:100%; padding:14px; background:var(--accent); color:#fff; border:none; border-radius:6px; font-family:var(--sans); font-weight:900; font-size:15px; letter-spacing:4px; text-transform:uppercase; cursor:pointer; transition:all .2s; margin-top:4px; box-shadow:0 3px 10px rgba(26,122,63,.25); }
+  .btn-submit:hover { background:#145f30; box-shadow:0 5px 18px rgba(26,122,63,.35); transform:translateY(-1px); }
+  .btn-submit:active { transform:translateY(0); }
+
+  .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; position:relative; overflow:hidden; box-shadow:0 2px 6px rgba(26,122,63,.06); }
+  .stat-card::before { content:''; position:absolute; top:0;left:0;right:0; height:3px; }
+  .stat-card.s1::before{background:var(--accent)} .stat-card.s2::before{background:#16a34a} .stat-card.s3::before{background:var(--accent3)} .stat-card.s4::before{background:var(--danger)}
+  .stat-label { font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px; }
+  .stat-value { font-family:var(--sans); font-weight:900; font-size:28px; line-height:1; }
+  .stat-card.s1 .stat-value{color:var(--accent)} .stat-card.s2 .stat-value{color:#16a34a} .stat-card.s3 .stat-value{color:var(--accent3)} .stat-card.s4 .stat-value{color:var(--danger)}
+
+  .table-controls { padding:14px 20px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border); flex-wrap:wrap; background:var(--surface2); }
+  .search-box { background:var(--field-bg); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:12px; padding:8px 12px; border-radius:5px; outline:none; width:180px; transition:border-color .2s; }
+  .search-box:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(26,122,63,.1); }
+  .filter-select { background:var(--field-bg); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:12px; padding:8px 28px 8px 12px; border-radius:5px; outline:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%235a7a65' d='M5 6L0 0h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; cursor:pointer; }
+
+  .export-group { display:flex; gap:8px; margin-left:auto; }
+  .btn-export-xlsx { padding:8px 16px; background:#d4f0e0; border:1.5px solid var(--accent2); color:var(--accent); border-radius:5px; font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .btn-export-xlsx:hover { background:#bee8d0; }
+  .btn-export-csv { padding:8px 16px; background:#dbeafe; border:1.5px solid #93c5fd; color:var(--accent3); border-radius:5px; font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .btn-export-csv:hover { background:#bfdbfe; }
+  .btn-export-html { padding:8px 16px; background:#fef3c7; border:1.5px solid #f59e0b; color:#92400e; border-radius:5px; font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .btn-export-html:hover { background:#fde68a; }
+  .btn-clear-all { padding:8px 16px; background:#fee2e2; border:1.5px solid #fca5a5; color:var(--danger); border-radius:5px; font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .btn-clear-all:hover { background:#fecaca; }
+  .btn-backup { padding:8px 14px; background:#f0faf4; border:1.5px solid var(--border); color:var(--text-dim); border-radius:5px; font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; white-space:nowrap; display:flex; align-items:center; gap:5px; }
+  .btn-backup:hover { background:#d4f0e0; border-color:var(--accent); color:var(--accent); }
+  body.visor-mode .btn-backup { display:none; }
+
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  thead th { padding:10px 12px; text-align:left; font-family:var(--mono); font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); background:var(--surface2); border-bottom:1.5px solid var(--border); white-space:nowrap; cursor:pointer; user-select:none; transition:color .15s; }
+  thead th:hover { color:var(--accent); }
+  tbody tr { border-bottom:1px solid #daeee4; transition:background .1s; animation:rowIn .3s ease; }
+  @keyframes rowIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+  tbody tr:hover { background:#f0faf4; }
+  tbody td { padding:10px 12px; color:var(--text); vertical-align:middle; }
+
+  .tag { display:inline-block; padding:2px 7px; border-radius:3px; font-family:var(--mono); font-size:10px; letter-spacing:1px; font-weight:bold; text-transform:uppercase; white-space:nowrap; }
+  .tag-l1{background:#fef3c7;color:#92400e;border:1px solid #fcd34d}
+  .tag-l2{background:#d1fae5;color:#065f46;border:1px solid #6ee7b7}
+  .tag-etapa{background:#dbeafe;color:#1e40af;border:1px solid #93c5fd}
+  .tag-date{background:#f0fdf4;color:var(--accent);border:1px solid #86efac;font-size:10px;}
+
+  .mono-cell { font-family:var(--mono); font-size:11px; }
+  .duration-pill { font-family:var(--mono); font-size:11px; color:var(--accent3); background:#dbeafe; border:1px solid #93c5fd; padding:2px 7px; border-radius:3px; white-space:nowrap; }
+  .id-badge { font-family:var(--mono); font-size:11px; color:#5a7a65; background:#f0faf4; border:1px solid var(--border); padding:2px 6px; border-radius:3px; }
+  .prod-cell { max-width:160px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:11px; color:var(--text-bright); cursor:default; }
+
+  .btn-delete { background:none; border:none; color:#aaa; cursor:pointer; padding:3px 7px; border-radius:3px; font-size:14px; transition:color .15s, background .15s; }
+  .btn-delete:hover { color:var(--danger); background:#fee2e2; }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
+  .empty-icon { font-size:48px; margin-bottom:12px; opacity:.4; }
+  .empty-text { font-family:var(--mono); font-size:12px; letter-spacing:2px; text-transform:uppercase; }
+  .table-wrapper { overflow-x:auto; }
+
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .modal-overlay.show { opacity:1; pointer-events:all; }
+  .modal { background:#fff; border:1px solid var(--border); border-radius:8px; padding:28px; width:380px; max-width:90vw; box-shadow:0 8px 32px rgba(26,122,63,.15); }
+  .modal-title { font-family:var(--sans); font-weight:900; font-size:18px; letter-spacing:3px; text-transform:uppercase; color:var(--text-bright); margin-bottom:20px; }
+  .modal-field { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .modal-field label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+  .modal-field input, .modal-field select { background:var(--field-bg); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; padding:10px 12px; border-radius:5px; outline:none; width:100%; appearance:none; -webkit-appearance:none; }
+  .modal-field input:focus { border-color:var(--accent); }
+  .modal-actions { display:flex; gap:10px; margin-top:8px; }
+  .btn-modal-ok { flex:1; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:5px; font-family:var(--sans); font-weight:900; font-size:14px; letter-spacing:3px; text-transform:uppercase; cursor:pointer; transition:all .15s; }
+  .btn-modal-ok:hover { background:#145f30; }
+  .btn-modal-cancel { padding:12px 20px; background:transparent; border:1px solid var(--border); color:var(--text-dim); border-radius:5px; font-family:var(--sans); font-weight:700; font-size:13px; cursor:pointer; transition:all .15s; }
+  .btn-modal-cancel:hover { border-color:var(--text-dim); color:var(--text); }
+
+  .btn-update-bd { display:flex; align-items:center; gap:7px; padding:9px 18px; background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.5); color:#fff; border-radius:6px; font-family:var(--sans); font-weight:700; font-size:13px; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .btn-update-bd:hover { background:rgba(255,255,255,.28); border-color:#fff; }
+
+  /* Edit modal */
+  #edit-modal { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:300; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+  #edit-modal.show { opacity:1; pointer-events:all; }
+  .edit-modal-box { background:#fff; border-radius:10px; padding:28px; width:520px; max-width:95vw; box-shadow:0 12px 40px rgba(0,0,0,.18); max-height:90vh; overflow-y:auto; }
+  .edit-modal-title { font-family:var(--sans); font-weight:900; font-size:18px; letter-spacing:2px; text-transform:uppercase; color:var(--text-bright); margin-bottom:18px; display:flex; align-items:center; gap:10px; }
+  .edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  .edit-field { display:flex; flex-direction:column; gap:4px; }
+  .edit-field.full { grid-column:1/-1; }
+  .edit-field label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+  .edit-field input, .edit-field select { background:var(--field-bg); border:1px solid var(--border); color:var(--text); font-family:var(--mono); font-size:13px; padding:9px 11px; border-radius:5px; outline:none; width:100%; appearance:none; -webkit-appearance:none; }
+  .edit-field input:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(26,122,63,.12); }
+  .edit-actions { display:flex; gap:10px; margin-top:6px; }
+  .btn-edit-save { flex:1; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:6px; font-family:var(--sans); font-weight:900; font-size:14px; letter-spacing:3px; text-transform:uppercase; cursor:pointer; transition:all .15s; }
+  .btn-edit-save:hover { background:#145f30; }
+  .btn-edit-cancel { padding:12px 20px; background:transparent; border:1.5px solid var(--border); color:var(--text-dim); border-radius:6px; font-family:var(--sans); font-weight:700; font-size:13px; cursor:pointer; }
+  .btn-edit-cancel:hover { border-color:var(--accent); color:var(--text); }
+
+  /* Row action buttons */
+  .row-actions { display:flex; gap:4px; align-items:center; }
+  .btn-edit-row { background:none; border:1px solid var(--border); color:var(--text-dim); cursor:pointer; padding:3px 8px; border-radius:4px; font-size:12px; transition:all .15s; }
+  .btn-edit-row:hover { border-color:var(--accent3); color:var(--accent3); background:#dbeafe; }
+
+  /* Visor mode */
+  .visor-banner { background:#1e3a5f; color:#fff; text-align:center; padding:10px; font-family:var(--mono); font-size:12px; letter-spacing:2px; text-transform:uppercase; }
+  .visor-badge { display:inline-block; background:#f59e0b; color:#000; padding:2px 10px; border-radius:3px; margin-left:10px; font-size:10px; font-weight:bold; }
+  body.visor-mode main { grid-template-columns:1fr; }
+  body.visor-mode #panel-form { display:none; }
+  body.visor-mode .btn-update-bd { display:none; }
+  body.visor-mode .btn-clear-all { display:none; }
+  .bd-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-family:var(--mono); font-size:10px; letter-spacing:1px; }
+  .bd-badge.default { background:#fef9e7; color:#92400e; border:1px solid #fcd34d; }
+  .bd-badge.loaded  { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+
+  /* ── Bandejas paralelas ── */
+  .trays-section { margin-bottom:0; }
+  .trays-header { display:flex; align-items:center; justify-content:space-between; padding:10px 18px 6px; }
+  .trays-title { font-family:var(--sans); font-weight:700; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+  .trays-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 14px 14px; }
+  .tray { border:1.5px dashed var(--border); border-radius:8px; padding:10px 12px; background:var(--field-bg); min-height:80px; display:flex; flex-direction:column; gap:6px; position:relative; cursor:pointer; transition:all .2s; }
+  .tray:hover { border-color:var(--accent2); }
+  .tray.empty { align-items:center; justify-content:center; }
+  .tray.empty .tray-empty-label { font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1px; text-align:center; }
+  .tray.active { border:1.5px solid var(--accent); background:#f0fdf4; cursor:default; }
+  .tray.paused { border:1.5px solid #f59e0b; background:#fffbeb; cursor:default; }
+  .tray.filling { border:2px solid var(--accent); background:#fff; cursor:default; box-shadow:0 0 0 3px rgba(26,122,63,.1); }
+  .tray-num { position:absolute; top:6px; right:8px; font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; }
+  .tray-producto { font-family:var(--sans); font-weight:700; font-size:11px; color:var(--text-bright); letter-spacing:.5px; line-height:1.3; }
+  .tray-meta { font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:.5px; }
+  .tray-timer { font-family:var(--mono); font-size:18px; font-weight:bold; color:var(--accent); letter-spacing:2px; }
+  .tray.paused .tray-timer { color:#f59e0b; }
+  .tray-inicio { font-family:var(--mono); font-size:9px; color:var(--text-dim); }
+  .tray-actions { display:flex; gap:4px; margin-top:2px; }
+  .tray-btn { padding:4px 8px; border:none; border-radius:4px; font-family:var(--sans); font-weight:700; font-size:10px; letter-spacing:.5px; cursor:pointer; transition:all .15s; }
+  .tray-btn-pause { background:#fef3c7; color:#92400e; }
+  .tray-btn-pause:hover { background:#fcd34d; }
+  .tray-btn-resume { background:#d1fae5; color:#065f46; }
+  .tray-btn-resume:hover { background:#6ee7b7; }
+  .tray-btn-finish { background:var(--accent); color:#fff; }
+  .tray-btn-finish:hover { background:var(--accent2); }
+  .tray-btn-cancel { background:#fee2e2; color:#991b1b; }
+  .tray-btn-cancel:hover { background:#fca5a5; }
+  .tray-btn-use { background:var(--accent); color:#fff; width:100%; text-align:center; padding:6px; }
+  .tray-btn-use:hover { background:var(--accent2); }
+
+  /* Searchable select */
+  .searchable-select { position:relative; }
+  .ss-input { width:100%; padding:10px 14px; background:var(--field-bg); border:1.5px solid var(--border); border-radius:6px; font-family:var(--mono); font-size:12px; color:var(--text); outline:none; transition:border .15s; }
+  .ss-input:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(26,122,63,.1); }
+  .ss-input:disabled { opacity:.5; cursor:not-allowed; }
+  .ss-dropdown { display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; background:#fff; border:1.5px solid var(--accent); border-radius:6px; max-height:200px; overflow-y:auto; z-index:200; box-shadow:0 4px 16px rgba(26,122,63,.15); }
+  .ss-dropdown.open { display:block; }
+  .ss-option { padding:9px 14px; font-family:var(--mono); font-size:11px; color:var(--text); cursor:pointer; border-bottom:1px solid var(--border); transition:background .1s; }
+  .ss-option:last-child { border-bottom:none; }
+  .ss-option:hover, .ss-option.active { background:var(--field-bg); color:var(--accent); }
+  .ss-option.selected { background:#d1fae5; color:var(--accent); font-weight:bold; }
+  .ss-empty { padding:10px 14px; font-family:var(--mono); font-size:11px; color:var(--text-dim); text-align:center; }
+
+  /* BD modal */
+  #bd-modal { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:300; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
+  #bd-modal.show { opacity:1; pointer-events:all; }
+  .bd-modal-box { background:#fff; border-radius:10px; padding:32px; width:440px; max-width:92vw; box-shadow:0 12px 40px rgba(0,0,0,.15); }
+  .bd-modal-title { font-family:var(--sans); font-weight:900; font-size:20px; letter-spacing:2px; text-transform:uppercase; color:var(--text-bright); margin-bottom:6px; }
+  .bd-modal-sub { font-family:var(--body); font-size:13px; color:var(--text-dim); margin-bottom:20px; line-height:1.5; }
+  .bd-preview { background:var(--field-bg); border:1px solid var(--border); border-radius:6px; padding:14px 16px; margin-bottom:20px; max-height:200px; overflow-y:auto; }
+  .bd-preview-row { font-family:var(--mono); font-size:11px; color:var(--text); padding:3px 0; border-bottom:1px solid var(--border); display:flex; gap:10px; }
+  .bd-preview-row:last-child { border-bottom:none; }
+  .bd-preview-linea { color:var(--accent); font-weight:bold; min-width:140px; }
+  .bd-preview-count { color:var(--text-dim); }
+  .bd-modal-actions { display:flex; gap:10px; }
+  .btn-bd-confirm { flex:1; padding:12px; background:var(--accent); color:#fff; border:none; border-radius:6px; font-family:var(--sans); font-weight:900; font-size:14px; letter-spacing:3px; text-transform:uppercase; cursor:pointer; transition:all .15s; }
+  .btn-bd-confirm:hover { background:#145f30; }
+  .btn-bd-cancel { padding:12px 20px; background:transparent; border:1.5px solid var(--border); color:var(--text-dim); border-radius:6px; font-family:var(--sans); font-weight:700; font-size:13px; cursor:pointer; transition:all .15s; }
+  .btn-bd-cancel:hover { border-color:var(--accent); color:var(--text); }
+
+  #toast { position:fixed; bottom:28px; right:28px; padding:12px 20px; border-radius:5px; font-family:var(--sans); font-weight:700; font-size:14px; letter-spacing:1px; transform:translateY(80px); opacity:0; transition:all .3s cubic-bezier(.34,1.56,.64,1); z-index:999; pointer-events:none; box-shadow:0 4px 16px rgba(0,0,0,.15); }
+  #toast.show { transform:translateY(0); opacity:1; }
+
+  ::-webkit-scrollbar{width:6px;height:6px} ::-webkit-scrollbar-track{background:#f0faf4} ::-webkit-scrollbar-thumb{background:#b2dfc5;border-radius:3px} ::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+  @media(max-width:1150px){main{grid-template-columns:1fr}.stats-row{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){header{padding:0 16px}main{padding:16px}}
+</style>
+</head>
+<body>
+
+<!-- VISOR BANNER (shown only in visor mode) -->
+<div id="visor-banner" class="visor-banner" style="display:none">
+  👁 MODO VISUALIZACIÓN — Solo lectura <span class="visor-badge">VISOR</span>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">Oregon Foods</div>
+      <div class="logo-sub">Control de Tiempos de Producción</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span id="sync-status"></span>
+    <button class="btn-update-bd" onclick="gsLoadAll()" title="Recargar datos desde Google Sheets">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Recargar
+    </button>
+    <button class="btn-update-bd" onclick="document.getElementById('input-bd').click()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Actualizar BD
+    </button>
+    <input type="file" id="input-bd" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="loadBD(event)">
+    <div style="text-align:right">
+      <div id="live-clock">--:--:--</div>
+      <div class="date-label" id="live-date">---</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- FORMULARIO -->
+  <div class="panel" id="panel-form">
+    <div class="panel-header">
+      <div class="panel-header-dot"></div>
+      <div class="panel-title">Registrar Proceso</div>
+    </div>
+    <div class="form-body">
+
+      <!-- BANDEJAS PARALELAS -->
+      <div class="trays-section">
+        <div class="trays-header">
+          <span class="trays-title">⏱ Procesos activos</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim)" id="trays-hint">Inicia un proceso y aparecerá aquí</span>
+        </div>
+        <div class="trays-grid" id="trays-grid">
+          <div class="tray empty" id="tray-0" onclick="trayClick(0)"><span class="tray-empty-label">+ Nuevo proceso</span><span class="tray-num">1</span></div>
+          <div class="tray empty" id="tray-1" onclick="trayClick(1)"><span class="tray-empty-label">+ Nuevo proceso</span><span class="tray-num">2</span></div>
+          <div class="tray empty" id="tray-2" onclick="trayClick(2)"><span class="tray-empty-label">+ Nuevo proceso</span><span class="tray-num">3</span></div>
+          <div class="tray empty" id="tray-3" onclick="trayClick(3)"><span class="tray-empty-label">+ Nuevo proceso</span><span class="tray-num">4</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label">▸ Fecha y producto</div>
+
+      <!-- FECHA MANUAL -->
+      <div class="field">
+        <label>📅 Fecha de Producción</label>
+        <input type="date" id="f-fecha">
+        <span class="field-hint" id="hint-fecha" style="color:var(--accent2)">Se inicializa con la fecha de hoy</span>
+      </div>
+
+      <!-- LÍNEA -->
+      <div class="field">
+        <label>1 · Línea de Producción</label>
+        <select id="f-linea" onchange="onLineaChange()">
+          <option value="">— Seleccionar línea —</option>
+          <option value="CORTES DE POLLO">CORTES DE POLLO</option>
+          <option value="EMBUTIDOS">EMBUTIDOS</option>
+          <option value="HAMBURGUESAS">HAMBURGUESAS</option>
+        </select>
+      </div>
+
+      <!-- ETAPA + PROCESO (fila 2) -->
+      <div class="field-row">
+        <div class="field">
+          <label>2 · Etapa</label>
+          <select id="f-etapa" onchange="onEtapaChange()" disabled>
+            <option value="">— Etapa —</option>
+          </select>
+          <span class="field-hint" id="hint-etapa">Selecciona línea primero</span>
+        </div>
+        <div class="field">
+          <label>3 · Proceso</label>
+          <select id="f-proceso" disabled onchange="onProcesoChange()">
+            <option value="">— Proceso —</option>
+          </select>
+          <span class="field-hint" id="hint-proceso">Selecciona etapa primero</span>
+        </div>
+      </div>
+
+      <!-- ID + PRODUCTO (fila 3, filtrados por etapa) -->
+      <div class="field-row">
+        <div class="field">
+          <label>4 · ID Producto</label>
+          <div class="searchable-select" id="ss-id">
+            <input type="text" class="ss-input" id="f-id-search" placeholder="Buscar ID..." autocomplete="off" disabled oninput="filterSS('id')" onfocus="openSS('id')" onblur="closeSS('id', 300)">
+            <input type="hidden" id="f-id">
+            <div class="ss-dropdown" id="ss-id-list"></div>
+          </div>
+          <span class="field-hint" id="hint-id">Selecciona etapa primero</span>
+        </div>
+        <div class="field">
+          <label>5 · Producto</label>
+          <div class="searchable-select" id="ss-producto">
+            <input type="text" class="ss-input" id="f-producto-search" placeholder="Buscar producto..." autocomplete="off" disabled oninput="filterSS('producto')" onfocus="openSS('producto')" onblur="closeSS('producto', 300)">
+            <input type="hidden" id="f-producto">
+            <div class="ss-dropdown" id="ss-producto-list"></div>
+          </div>
+          <span class="field-hint" id="hint-prod"></span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label">▸ Tiempos</div>
+
+      <!-- Mode toggle -->
+      <div class="time-mode-toggle">
+        <button class="btn-mode active" id="btn-mode-auto" onclick="setTimeMode('auto')">⏱ Captura automática</button>
+        <button class="btn-mode" id="btn-mode-manual" onclick="setTimeMode('manual')">✎ Ingreso manual</button>
+      </div>
+
+      <!-- AUTO mode -->
+      <div id="time-auto-block">
+        <div class="timer-group">
+          <button class="btn-time btn-start" onclick="setTime('inicio')">▶ INICIO</button>
+          <button class="btn-time btn-end" onclick="setTime('fin')">■ FIN</button>
+        </div>
+        <div class="timer-group" style="margin-top:8px">
+          <div class="time-display" id="display-inicio">--:--:--</div>
+          <div class="time-display" id="display-fin">--:--:--</div>
+        </div>
+      </div>
+
+      <!-- MANUAL mode -->
+      <div id="time-manual-block" style="display:none">
+        <div class="field-row">
+          <div class="field">
+            <label>Hora Inicio</label>
+            <input type="time" id="f-inicio-manual" step="1" oninput="calcManualDur()">
+          </div>
+          <div class="field">
+            <label>Hora Fin</label>
+            <input type="time" id="f-fin-manual" step="1" oninput="calcManualDur()">
+          </div>
+        </div>
+      </div>
+
+      <div class="duration-badge">
+        <span class="duration-label">Duración calculada</span>
+        <span class="duration-value" id="display-dur">--:--:--</span>
+      </div>
+
+      <div class="divider"></div>
+      <div class="section-label">▸ Producción</div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>N° Personas</label>
+          <input type="number" id="f-personas" placeholder="0" min="1">
+        </div>
+        <div class="field">
+          <label>Volumen (kg)</label>
+          <input type="number" id="f-volumen" placeholder="0.00" step="0.01" min="0" oninput="calcUnidades()">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Observaciones (opcional)</label>
+        <input type="text" id="f-obs" placeholder="Notas del proceso...">
+      </div>
+
+      <!-- CAMPOS EXTRA (condicionales) -->
+      <div id="extra-fields">
+        <!-- Temperatura + Lote — solo embutidos y hamburguesas -->
+        <div id="extra-temp-lote" style="display:none">
+        <div class="field-row">
+          <div class="field">
+            <label>🌡 Temperatura (°C)</label>
+            <input type="number" id="f-temperatura" placeholder="0.0" step="0.1">
+          </div>
+          <div class="field">
+            <label>🏷 Lote</label>
+            <input type="text" id="f-lote" placeholder="N° lote...">
+          </div>
+        </div>
+        </div>
+        <!-- Merma + Unidades (solo etapa EMPAQUE) -->
+        <div id="extra-empaque" style="display:none">
+          <div class="field-row">
+            <div class="field">
+              <label>📉 Merma (kg)</label>
+              <input type="number" id="f-merma" placeholder="0.00" step="0.01" min="0">
+            </div>
+            <div class="field">
+              <label>📦 Unidades <span id="hint-unidades" style="font-size:9px;color:var(--text-dim)"></span></label>
+              <input type="number" id="f-unidades" placeholder="Auto" step="1" min="0" readonly style="opacity:.7;background:#f0faf4">
+            </div>
+          </div>
+        </div>
+        <!-- Maestro de Mesa (solo CORTES DE POLLO) -->
+        <div id="extra-maestro" style="display:none">
+          <div class="divider"></div>
+          <div class="section-label">▸ Maestro de Mesa</div>
+          <div class="field-row">
+            <div class="field">
+              <label>👤 Nombre Maestro</label>
+              <input type="text" id="f-maestro-nombre" placeholder="Maestro de Mesa">
+            </div>
+            <div class="field">
+              <label>⚖ Vol. Maestro (kg)</label>
+              <input type="number" id="f-maestro-volumen" placeholder="0.00" step="0.01" min="0">
+            </div>
+          </div>
+        </div>
+        <!-- Humo Líquido (solo COCCION de EMBUTIDOS) -->
+        <div id="extra-humo" style="display:none">
+          <div class="field">
+            <label>💨 Humo Líquido (ml)</label>
+            <input type="number" id="f-humo" placeholder="0.0" step="0.1" min="0">
+          </div>
+        </div>
+        <!-- Equipo (solo COCCION de EMBUTIDOS) -->
+        <div id="extra-equipo" style="display:none">
+          <div class="field">
+            <label>🔧 Equipo</label>
+            <select id="f-equipo">
+              <option value="">— Seleccionar equipo —</option>
+              <option value="Horno">Horno</option>
+              <option value="Marmita">Marmita</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn-submit" style="flex:1;background:var(--accent2)" onclick="enviarBandeja()">▶ INICIAR en bandeja</button>
+        <button class="btn-submit" style="flex:1;background:#4b5563;font-size:11px" onclick="registrar()">✓ Registrar directo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA -->
+  <div id="panel-tabla">
+    <div class="stats-row">
+      <div class="stat-card s1"><div class="stat-label">Registros Totales</div><div class="stat-value" id="stat-total">0</div></div>
+      <div class="stat-card s2"><div class="stat-label">Total Personas</div><div class="stat-value" id="stat-personas">0</div></div>
+      <div class="stat-card s3"><div class="stat-label">Volumen (kg)</div><div class="stat-value" id="stat-volumen">0</div></div>
+      <div class="stat-card s4"><div class="stat-label">Líneas Activas</div><div class="stat-value" id="stat-lineas">0</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-header-dot" style="background:var(--accent3);box-shadow:0 0 8px var(--accent3)"></div>
+        <div class="panel-title">Registros de Producción</div>
+      </div>
+      <div class="table-controls">
+        <input class="search-box" type="text" placeholder="Buscar..." id="search-input" oninput="renderTable()">
+        <select class="filter-select" id="filter-linea" onchange="renderTable()">
+          <option value="">Todas las líneas</option>
+          <option value="CORTES DE POLLO">CORTES DE POLLO</option>
+          <option value="EMBUTIDOS">EMBUTIDOS</option>
+          <option value="HAMBURGUESAS">HAMBURGUESAS</option>
+        </select>
+        <input type="date" id="filter-fecha" onchange="renderTable()" style="background:var(--field-bg);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px;border-radius:5px;outline:none;cursor:pointer;color-scheme:light;">
+        <div class="export-group">
+          <button class="btn-export-xlsx" onclick="exportXLSX()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+            Excel
+          </button>
+          <button class="btn-export-csv" onclick="exportCSV()">CSV</button>
+          <button class="btn-export-html" onclick="exportHTML()" title="Generar reporte para compartir por WhatsApp/correo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Compartir
+          </button>
+          <button class="btn-clear-all" onclick="clearAll()">✕</button>
+          <button class="btn-backup" onclick="doBackup()" title="Guardar backup JSON de todos los registros">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Backup
+          </button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('fecha')">Fecha ↕</th>
+              <th onclick="sortBy('linea')">Línea ↕</th>
+              <th onclick="sortBy('producto')">Producto ↕</th>
+              <th onclick="sortBy('proceso')">Proceso ↕</th>
+              <th>Inicio</th>
+              <th>Fin</th>
+              <th onclick="sortBy('durMin')">Duración ↕</th>
+              <th onclick="sortBy('personas')">Pers. ↕</th>
+              <th onclick="sortBy('volumen')">Vol. kg ↕</th>
+              <th onclick="sortBy('productividad')">Productiv. ↕</th>
+              <th>Obs.</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-text">Sin registros — ingresa el primer proceso</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- FLOATING NAV (visible only on narrow screens) -->
+<div class="panel-nav" id="panel-nav">
+  <button class="btn-nav active" id="nav-form" onclick="navTo('form')">📋 Formulario</button>
+  <button class="btn-nav" id="nav-tabla" onclick="navTo('tabla')">📊 Tabla</button>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal">
+  <div class="edit-modal-box">
+    <div class="edit-modal-title">✏️ Editar Registro</div>
+    <div class="edit-grid">
+      <div class="edit-field">
+        <label>Fecha</label>
+        <input type="date" id="e-fecha">
+      </div>
+      <div class="edit-field">
+        <label>Línea</label>
+        <input type="text" id="e-linea" readonly style="opacity:.6;cursor:default">
+      </div>
+      <div class="edit-field">
+        <label>Producto</label>
+        <input type="text" id="e-producto" readonly style="opacity:.6;cursor:default">
+      </div>
+      <div class="edit-field">
+        <label>Proceso</label>
+        <input type="text" id="e-proceso" readonly style="opacity:.6;cursor:default">
+      </div>
+      <div class="edit-field">
+        <label>Hora Inicio</label>
+        <input type="time" id="e-inicio" step="1" oninput="updateEditDur()">
+      </div>
+      <div class="edit-field">
+        <label>Hora Fin</label>
+        <input type="time" id="e-fin" step="1" oninput="updateEditDur()">
+      </div>
+      <div class="edit-field">
+        <label>N° Personas</label>
+        <input type="number" id="e-personas" min="1" oninput="updateEditDur()">
+      </div>
+      <div class="edit-field">
+        <label>Volumen (kg)</label>
+        <input type="number" id="e-volumen" step="0.01" min="0" oninput="updateEditDur()">
+      </div>
+      <div class="edit-field full">
+        <label>Observaciones</label>
+        <input type="text" id="e-obs" placeholder="Notas del proceso...">
+      </div>
+      <div class="edit-field full" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)">Duración / Productividad</span>
+        <span id="e-dur-preview" style="font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:bold">--:--:-- · — kg/p·h</span>
+      </div>
+    </div>
+    <div class="edit-actions">
+      <button class="btn-edit-cancel" onclick="closeEditModal()">Cancelar</button>
+      <button class="btn-edit-save" onclick="saveEdit()">✓ Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- BD UPDATE MODAL -->
+<div id="bd-modal">
+  <div class="bd-modal-box">
+    <div class="bd-modal-title">📂 Actualizar Base de Datos</div>
+    <div class="bd-modal-sub" id="bd-modal-sub">Cargando archivo...</div>
+    <div class="bd-preview" id="bd-preview"></div>
+    <div class="bd-modal-actions">
+      <button class="btn-bd-cancel" onclick="closeBDModal()">Cancelar</button>
+      <button class="btn-bd-confirm" id="btn-bd-confirm" onclick="applyBD()">✓ Aplicar BD</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── BASE DE DATOS ─────────────────────────────────────────────────────────────
+const BD_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRcY307hJ-oa78BP3hSiTe7Fzf4U9e4aO-tcPD-8I_3Mr5W1L5rgPf1o81SMDFnIYHvrQE2s7RWBt2p/pub?gid=467156008&single=true&output=csv';
+
+// BD embebida como fallback (se actualiza desde Sheets automáticamente)
+const BD_FALLBACK = {"CORTES DE POLLO":{"3873":{"id":"3873","producto":"POLLO ENTERO S/M 2.00 KG - 2.50 KG ENF TECAVI","etapas":["DESPOSTE"],"procesos":{"DESPOSTE":["DESPOSTE"]},"factor":0},"4663":{"id":"4663","producto":"PECHUGA ESPECIAL C/ALA PI","etapas":["DESPOSTE","DESHUESADO"],"procesos":{"DESPOSTE":["DESPOSTE"],"DESHUESADO":["DESHUESADO"]},"factor":0},"4674":{"id":"4674","producto":"PIERNA ESPECIAL PI","etapas":["DESPOSTE"],"procesos":{"DESPOSTE":["DESPOSTE"]},"factor":0},"4589":{"id":"4589","producto":"ALA DE POLLO ENTERA PI","etapas":["DESPOSTE"],"procesos":{"DESPOSTE":["DESPOSTE"]},"factor":0},"477":{"id":"477","producto":"FILETE DE PECHUGA DE POLLO CONG OREGON FOODS","etapas":["FILETEO"],"procesos":{"FILETEO":["FILETEO"]},"factor":0}},"EMBUTIDOS":{"3647":{"id":"3647","producto":"JAMON INGLES | MOLDE || ENF | MP || OF","etapas":["PROCESO","COCCION"],"procesos":{"PROCESO":["FORMULADO","INYECCIÓN","CORTADO MP","TUMBLEADO","CLIPEADO INICIAL","EMBUTIDO","SELLADO AL VACIO","CLIPEADO FINAL","MOLDEADO"],"COCCION":["COCCION"]},"factor":0},"2965":{"id":"2965","producto":"JAMON DEL PAIS ||| ENF | EV X 150 GR || OF","etapas":["EMPAQUE"],"procesos":{"EMPAQUE":["PINTADO","LAMINADO","ENVASADO (TFM)","EMBOLSADO","ETIQUETADO","DETECCIÓN DE METALES","SELLADO AL VACIO","EMPACADO"]},"factor":0},"3786":{"id":"3786","producto":"SALCHICHA VIENESA AHUMADA X KG - MP","etapas":["PROCESO","COCCION"],"procesos":{"PROCESO":["FORMULADO","MOLIENDA","TUMBLEADO","EMBUTIDO","COLGADO","DUCHADO"],"COCCION":["COCCION"]},"factor":0},"2955":{"id":"2955","producto":"VIENESA AHUMADA || 5 UN | ENF | EVC X 250 GR || OF","etapas":["EMPAQUE"],"procesos":{"EMPAQUE":["SEPARACIÓN MANUAL","ENVASADO (TFM)","ETIQUETADO"]},"factor":0}},"HAMBURGUESAS":{"379":{"id":"379","producto":"CARNE MOLIDA ESPECIAL 5MM X 2KG X 6BLS CAPORAL","etapas":["PROCESO"],"procesos":{"PROCESO":["PROCESO"]},"factor":0}}};
+
+let BD = JSON.parse(localStorage.getItem('oregon_bd_cache') || 'null') || BD_FALLBACK;
+
+function parseBDcsv(csv) {
+  // Robust CSV parser that handles quoted fields with commas and \r\n line endings
+  function parseRow(row) {
+    const cols = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < row.length; i++) {
+      const ch = row[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+      else if (ch === '\r') { continue; } // skip CR
+      else { cur += ch; }
+    }
+    cols.push(cur.trim());
+    return cols;
+  }
+
+  const lines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n').slice(1);
+  const parsed = {};
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    const [linea, id, producto, etapa, proceso, factor] = parseRow(line);
+    if (!linea || !id) continue;
+    if (!parsed[linea]) parsed[linea] = {};
+    if (!parsed[linea][id]) parsed[linea][id] = {id, producto, etapas:[], procesos:{}, factor: parseFloat(factor)||0};
+    if (etapa && !parsed[linea][id].etapas.includes(etapa)) parsed[linea][id].etapas.push(etapa);
+    if (etapa && proceso) {
+      if (!parsed[linea][id].procesos[etapa]) parsed[linea][id].procesos[etapa] = [];
+      if (!parsed[linea][id].procesos[etapa].includes(proceso)) parsed[linea][id].procesos[etapa].push(proceso);
+    }
+    if (factor && parseFloat(factor)) parsed[linea][id].factor = parseFloat(factor);
+  }
+  return parsed;
+}
+
+async function loadBDFromSheets() {
+  try {
+    const res = await fetch(BD_URL);
+    const csv = await res.text();
+    const parsed = parseBDcsv(csv);
+    if (Object.keys(parsed).length > 0) {
+      BD = parsed;
+      localStorage.setItem('oregon_bd_cache', JSON.stringify(BD));
+      // Refresh línea dropdown
+      const lineas = Object.keys(BD);
+      const lineaOpts = '<option value="">— Seleccionar línea —</option>' + lineas.map(l=>`<option value="${l}">${l}</option>`).join('');
+      document.getElementById('f-linea').innerHTML = lineaOpts;
+      document.getElementById('filter-linea').innerHTML = '<option value="">Todas las líneas</option>' + lineas.map(l=>`<option value="${l}">${l}</option>`).join('');
+      showToast('✅ Base de datos actualizada desde Google Sheets');
+    }
+  } catch(e) {
+    if (Object.keys(BD).length === 0) {
+      showToast('⚠ No se pudo cargar la BD — sin caché disponible', '#dc2626');
+    }
+  }
+}
+
+// ── BD UPDATER ────────────────────────────────────────────────────────────────
+let pendingBD = null;
+
+function loadBD(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = ''; // reset so same file can be re-loaded
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      // Expect headers: LÍNEA PRODUCCIÓN, ID, PRODUCTO, ETAPA DE PROCESO, PROCESO
+      if (rows.length < 2) { showToast('⚠ El archivo está vacío','#dc2626'); return; }
+
+      const parsed = {};
+      for (let i = 1; i < rows.length; i++) {
+        const [linea, id, producto, etapa, proceso] = rows[i].map(v => String(v||'').trim());
+        if (!linea || !id) continue;
+        if (!parsed[linea]) parsed[linea] = {};
+        if (!parsed[linea][id]) parsed[linea][id] = {id, producto, etapas:[], procesos:[]};
+        if (etapa && !parsed[linea][id].etapas.includes(etapa)) parsed[linea][id].etapas.push(etapa);
+        if (proceso && !parsed[linea][id].procesos.includes(proceso)) parsed[linea][id].procesos.push(proceso);
+      }
+
+      const lineas = Object.keys(parsed);
+      if (!lineas.length) { showToast('⚠ No se encontraron datos válidos','#dc2626'); return; }
+
+      pendingBD = parsed;
+
+      // Build preview
+      const sub = `Se encontraron <strong>${lineas.length} líneas</strong> y <strong>${Object.values(parsed).reduce((a,l)=>a+Object.keys(l).length,0)} productos</strong> en <em>${file.name}</em>. ¿Deseas aplicar esta BD?`;
+      document.getElementById('bd-modal-sub').innerHTML = sub;
+      document.getElementById('bd-preview').innerHTML = lineas.map(linea => {
+        const count = Object.keys(parsed[linea]).length;
+        return `<div class="bd-preview-row"><span class="bd-preview-linea">${linea}</span><span class="bd-preview-count">${count} producto(s)</span></div>`;
+      }).join('');
+
+      document.getElementById('bd-modal').classList.add('show');
+    } catch(err) {
+      showToast('⚠ Error al leer el archivo','#dc2626');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function applyBD() {
+  if (!pendingBD) return;
+  BD = pendingBD;
+  pendingBD = null;
+
+  // Refresh línea selects
+  const lineas = Object.keys(BD);
+  const lineaOpts = '<option value="">— Seleccionar línea —</option>' + lineas.map(l=>`<option value="${l}">${l}</option>`).join('');
+  document.getElementById('f-linea').innerHTML = lineaOpts;
+  document.getElementById('filter-linea').innerHTML = '<option value="">Todas las líneas</option>' + lineas.map(l=>`<option value="${l}">${l}</option>`).join('');
+
+  // Reset cascades
+  ['f-id','f-producto','f-etapa','f-proceso'].forEach(i=>{ document.getElementById(i).innerHTML='<option value="">— Seleccionar —</option>'; document.getElementById(i).disabled=true; });
+
+  closeBDModal();
+  showToast(`✅ BD actualizada — ${lineas.length} líneas cargadas`);
+}
+
+function closeBDModal() {
+  document.getElementById('bd-modal').classList.remove('show');
+  pendingBD = null;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+const GS_URL = 'https://script.google.com/macros/s/AKfycbztjaSkDWOQjWFzly5kKPz3SVI0vRLBzcS_ldRS87jS1H04pMi_34oKJ-cRryHwQHGpEw/exec';
+let records = JSON.parse(localStorage.getItem('oregon_v3') || '[]');
+let startTime=null, endTime=null, sortKey=null, sortDir=1;
+let gsSyncing = false;
+
+// ── GOOGLE SHEETS SYNC ────────────────────────────────────────────────────────
+function setSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if(!el) { setTimeout(()=>setSyncStatus(state), 200); return; }
+  const map = {
+    ok:      {icon:'☁️', text:'Sincronizado', color:'#065f46', bg:'#d1fae5', border:'#6ee7b7'},
+    syncing: {icon:'🔄', text:'Sincronizando...', color:'#92400e', bg:'#fef3c7', border:'#fcd34d'},
+    error:   {icon:'⚠️', text:'Sin conexión — datos locales', color:'#991b1b', bg:'#fee2e2', border:'#fca5a5'},
+    offline: {icon:'💾', text:'Modo local', color:'#5a7a65', bg:'#f0faf4', border:'#b2dfc5'},
+  };
+  const s = map[state] || map.offline;
+  el.innerHTML = `${s.icon} ${s.text}`;
+  el.style.cssText = `display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:${s.color};background:${s.bg};border:1px solid ${s.border}`;
+}
+
+async function gsRequest(params) {
+  const url = new URL(GS_URL);
+  Object.entries(params).forEach(([k,v]) => {
+    url.searchParams.set(k, typeof v === 'object' ? encodeURIComponent(JSON.stringify(v)) : v);
+  });
+  const res = await fetch(url.toString(), {method:'GET'});
+  return res.json();
+}
+
+// GET via iframe to bypass CORS on Netlify
+function gsGet(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_gs_cb_' + Date.now();
+    const url = new URL(GS_URL);
+    Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, String(v)));
+    url.searchParams.set('callback', cbName);
+
+    window[cbName] = (data) => {
+      delete window[cbName];
+      const el = document.getElementById('_gs_jsonp_');
+      if(el) el.remove();
+      resolve(data);
+    };
+
+    // Remove any previous script
+    const old = document.getElementById('_gs_jsonp_');
+    if(old) old.remove();
+
+    const s = document.createElement('script');
+    s.id = '_gs_jsonp_';
+    s.src = url.toString();
+    s.onerror = () => {
+      delete window[cbName];
+      s.remove();
+      reject(new Error('Script load failed'));
+    };
+    document.head.appendChild(s);
+
+    setTimeout(() => {
+      if(window[cbName]) {
+        delete window[cbName];
+        const el = document.getElementById('_gs_jsonp_');
+        if(el) el.remove();
+        reject(new Error('Timeout'));
+      }
+    }, 15000);
+  });
+}
+
+// Write via JSONP script tag (same as gsGet, confirms save)
+function gsWrite(params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_gs_cb_' + Date.now();
+    const url = new URL(GS_URL);
+    Object.entries(params).forEach(([k,v]) => {
+      url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+    });
+    url.searchParams.set('callback', cbName);
+
+    window[cbName] = (data) => {
+      delete window[cbName];
+      const el = document.getElementById('_gs_write_');
+      if(el) el.remove();
+      resolve(data);
+    };
+
+    const old = document.getElementById('_gs_write_');
+    if(old) old.remove();
+
+    const s = document.createElement('script');
+    s.id = '_gs_write_';
+    s.src = url.toString();
+    s.onerror = () => {
+      delete window[cbName];
+      s.remove();
+      reject(new Error('Write failed'));
+    };
+    document.head.appendChild(s);
+
+    setTimeout(() => {
+      if(window[cbName]) {
+        delete window[cbName];
+        const el = document.getElementById('_gs_write_');
+        if(el) el.remove();
+        reject(new Error('Write timeout'));
+      }
+    }, 15000);
+  });
+}
+
+async function gsLoadAll() {
+  setSyncStatus('syncing');
+  try {
+    const data = await gsGet({action:'getAll'});
+    if(data.ok && Array.isArray(data.records)) {
+      records = data.records.map(r=>{
+        // Fix fecha — puede venir como ISO string o como número de Sheets
+        let fechaISO = String(r.fechaISO||'');
+        if(fechaISO.includes('T')) fechaISO = fechaISO.slice(0,10);
+
+        let fecha = String(r.fecha||'');
+        if(!fecha || fecha.includes('T') || fecha.includes('1899')) {
+          // Reconstruir desde fechaISO
+          if(fechaISO) {
+            const [y,m,d] = fechaISO.split('-');
+            fecha = `${d}/${m}/${y}`;
+          }
+        }
+
+        // Fix inicio/fin — pueden venir como ISO datetime
+        let inicio = String(r.inicio||'');
+        let fin = String(r.fin||'');
+        if(inicio.includes('T')) inicio = inicio.slice(11,19);
+        if(fin.includes('T')) fin = fin.slice(11,19);
+        // Asegurar formato HH:MM:SS
+        if(inicio.length === 5) inicio = inicio + ':00';
+        if(fin.length === 5) fin = fin + ':00';
+
+        const durMin = parseFloat(r.durMin)||durInMin(inicio,fin);
+        const personas = parseInt(r.personas)||0;
+        const volumen = parseFloat(r.volumen)||0;
+        const durH = Math.max(0.0001, durMin)/60;
+        const productividad = (personas > 0 && durH > 0) ? volumen/(personas*durH) : 0;
+
+        return {
+          ...r,
+          uid: Number(r.uid),
+          fechaISO,
+          fecha,
+          inicio,
+          fin,
+          durMin,
+          personas,
+          volumen,
+          productividad,
+        };
+      }).filter(r=>r.uid);
+      localStorage.setItem('oregon_v3', JSON.stringify(records));
+      renderTable(); updateStats();
+      setSyncStatus('ok');
+    } else {
+      setSyncStatus('error');
+    }
+  } catch(e) {
+    console.warn('gsLoadAll error:', e.message);
+    setSyncStatus('error');
+    showToast('⚠ Sin conexión — usando datos locales','#dc2626');
+  }
+}
+
+async function gsSave(record) {
+  try {
+    await gsWrite({action:'save', record});
+    setSyncStatus('ok');
+    // Remove from pending if it was there
+    removePending(record.uid);
+  } catch(e) {
+    setSyncStatus('error');
+    // Save to pending queue for later sync
+    addPending(record);
+    showToast('💾 Sin conexión — se sincronizará al volver la red');
+  }
+}
+
+async function gsDelete(uid) {
+  try {
+    await gsWrite({action:'delete', uid: String(uid)});
+    setSyncStatus('ok');
+  } catch(e) { setSyncStatus('error'); }
+}
+
+// ── COLA DE SINCRONIZACIÓN PENDIENTE ─────────────────────────────────────────
+function getPending() {
+  return JSON.parse(localStorage.getItem('oregon_pending') || '[]');
+}
+function addPending(record) {
+  const pending = getPending();
+  if(!pending.find(r => r.uid === record.uid)) {
+    pending.push(record);
+    localStorage.setItem('oregon_pending', JSON.stringify(pending));
+  }
+  updatePendingBadge();
+}
+function removePending(uid) {
+  const pending = getPending().filter(r => r.uid !== uid);
+  localStorage.setItem('oregon_pending', JSON.stringify(pending));
+  updatePendingBadge();
+}
+function updatePendingBadge() {
+  const count = getPending().length;
+  const el = document.getElementById('sync-status');
+  if(count > 0) {
+    setSyncStatus('error');
+    if(el) el.innerHTML = `💾 ${count} registro(s) pendiente(s)`;
+  }
+}
+async function syncPending() {
+  const pending = getPending();
+  if(!pending.length) return;
+  let synced = 0;
+  for(const record of pending) {
+    try {
+      await gsWrite({action:'save', record});
+      removePending(record.uid);
+      synced++;
+    } catch(e) { break; } // stop if still offline
+  }
+  if(synced > 0) {
+    showToast(`☁️ ${synced} registro(s) sincronizados`);
+    setSyncStatus('ok');
+  }
+}
+
+// Auto-sync when connection returns
+window.addEventListener('online', () => {
+  showToast('🌐 Conexión restaurada — sincronizando...');
+  setTimeout(syncPending, 1000);
+});
+
+// Also try sync every 30s in case online event was missed
+setInterval(() => {
+  if(navigator.onLine && getPending().length > 0) syncPending();
+}, 30000);
+
+// ── INIT DATE ─────────────────────────────────────────────────────────────────
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+document.getElementById('f-fecha').value = todayISO();
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function updateClock() {
+  const n = new Date();
+  document.getElementById('live-clock').textContent = n.toLocaleTimeString('es-PE');
+  document.getElementById('live-date').textContent = n.toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(updateClock,1000); updateClock();
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function pad(n){return String(n).padStart(2,'0');}
+function timeStr(d){return`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}
+function durInMin(a,b){const[h1,m1,s1]=a.split(':').map(Number),[h2,m2,s2]=b.split(':').map(Number);return((h2*3600+m2*60+s2)-(h1*3600+m1*60+s1))/60;}
+function durLabel(a,b){const d=Math.max(0,durInMin(a,b)*60);return`${pad(Math.floor(d/3600))}h ${pad(Math.floor((d%3600)/60))}m ${pad(Math.floor(d%60))}s`;}
+function durMinutes(a,b){return Math.max(0,durInMin(a,b)).toFixed(1);}
+function isoToDisplay(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}/${m}/${y}`;}
+
+function setOpts(id, opts, ph) {
+  const s=document.getElementById(id);
+  s.innerHTML=`<option value="">${ph}</option>`+opts.map(o=>`<option value="${o.v}">${o.l}</option>`).join('');
+}
+function resetDown(id, hintId, hintTxt) {
+  const s=document.getElementById(id); s.innerHTML=`<option value="">— Seleccionar —</option>`; s.disabled=true;
+  const h=document.getElementById(hintId); if(h){h.textContent=hintTxt; h.classList.remove('ok');}
+}
+
+// ── SEARCHABLE SELECT ─────────────────────────────────────────────────────────
+let ssData = { id: [], producto: [] };
+
+function populateSS(type, items) {
+  // items: [{v, l}]
+  ssData[type] = items;
+  const input = document.getElementById(`f-${type}-search`);
+  const hidden = document.getElementById(`f-${type}`);
+  input.disabled = items.length === 0;
+  input.value = '';
+  hidden.value = '';
+  renderSS(type, '');
+}
+
+function renderSS(type, query) {
+  const list = document.getElementById(`ss-${type}-list`);
+  const filtered = ssData[type].filter(item =>
+    item.l.toLowerCase().includes(query.toLowerCase()) ||
+    item.v.toLowerCase().includes(query.toLowerCase())
+  );
+  if(filtered.length === 0) {
+    list.innerHTML = `<div class="ss-empty">Sin resultados</div>`;
+  } else {
+    list.innerHTML = filtered.map(item =>
+      `<div class="ss-option" data-v="${item.v}" data-l="${item.l}" onmousedown="selectSS('${type}','${item.v.replace(/'/g,"\\'")}','${item.l.replace(/'/g,"\\'")}')">${type==='id'?item.l:`<span style="color:var(--text-dim);font-size:10px">${item.v} · </span>${item.l}`}</div>`
+    ).join('');
+  }
+}
+
+function filterSS(type) {
+  const query = document.getElementById(`f-${type}-search`).value;
+  renderSS(type, query);
+  openSS(type);
+}
+
+function openSS(type) {
+  document.getElementById(`ss-${type}-list`).classList.add('open');
+}
+
+function closeSS(type, delay=0) {
+  setTimeout(() => {
+    document.getElementById(`ss-${type}-list`).classList.remove('open');
+  }, delay);
+}
+
+function selectSS(type, v, l) {
+  const input = document.getElementById(`f-${type}-search`);
+  const hidden = document.getElementById(`f-${type}`);
+  input.value = type === 'id' ? v : l;
+  hidden.value = v;
+  closeSS(type);
+  // Mark selected
+  document.querySelectorAll(`#ss-${type}-list .ss-option`).forEach(el => {
+    el.classList.toggle('selected', el.dataset.v === v);
+  });
+  // Trigger sync
+  const linea = document.getElementById('f-linea').value;
+  const etapa = document.getElementById('f-etapa').value;
+  if(v) syncProcesos(linea, v, etapa);
+  // Sync the other field
+  if(type === 'id') {
+    const prod = ssData.producto.find(p => p.v === v);
+    if(prod) {
+      document.getElementById('f-producto-search').value = prod.l;
+      document.getElementById('f-producto').value = v;
+    }
+  } else {
+    document.getElementById('f-id-search').value = v;
+    document.getElementById('f-id').value = v;
+  }
+}
+
+function resetSS(type) {
+  const input = document.getElementById(`f-${type}-search`);
+  const hidden = document.getElementById(`f-${type}`);
+  if(input) { input.value = ''; input.disabled = true; }
+  if(hidden) hidden.value = '';
+  ssData[type] = [];
+  const list = document.getElementById(`ss-${type}-list`);
+  if(list) { list.innerHTML = ''; list.classList.remove('open'); }
+}
+
+// ── CASCADAS ──────────────────────────────────────────────────────────────────
+function onLineaChange() {
+  const linea = document.getElementById('f-linea').value;
+  const etapaEl = document.getElementById('f-etapa');
+  const procesoEl = document.getElementById('f-proceso');
+  etapaEl.innerHTML='<option value="">— Seleccionar —</option>'; etapaEl.disabled=true;
+  procesoEl.innerHTML='<option value="">— Seleccionar —</option>'; procesoEl.disabled=true;
+  resetSS('id'); resetSS('producto');
+  document.getElementById('hint-etapa').textContent = linea ? '' : 'Selecciona línea primero';
+  document.getElementById('hint-etapa').classList.remove('ok');
+  document.getElementById('hint-id').textContent = 'Selecciona etapa primero';
+  document.getElementById('hint-proceso').textContent = 'Selecciona etapa primero';
+  document.getElementById('hint-proceso').classList.remove('ok');
+  // Mostrar Maestro de Mesa solo en CORTES DE POLLO
+  const elMaestro = document.getElementById('extra-maestro');
+  const elEmpaque = document.getElementById('extra-empaque');
+  const elHumo = document.getElementById('extra-humo');
+  const elTempLote = document.getElementById('extra-temp-lote');
+  const esPollo = linea === 'CORTES DE POLLO';
+  if(elMaestro) elMaestro.style.display = esPollo ? 'block' : 'none';
+  if(elEmpaque) elEmpaque.style.display = 'none';
+  if(elHumo) elHumo.style.display = 'none';
+  if(elTempLote) elTempLote.style.display = esPollo ? 'none' : 'block';
+  if(!linea) return;
+  if(!BD[linea]) { showToast('⚠ BD no cargada aún, espera un momento','#dc2626'); return; }
+  const prods = BD[linea];
+  const etapasSet = new Set();
+  Object.values(prods).forEach(p => p.etapas.forEach(e => etapasSet.add(e)));
+  const etapas = [...etapasSet];
+  setOpts('f-etapa', etapas.map(e=>({v:e,l:e})), '— Etapa —');
+  etapaEl.disabled = false;
+  document.getElementById('hint-etapa').textContent = `${etapas.length} etapa(s) disponibles`;
+  if(etapas.length===1){ etapaEl.value=etapas[0]; onEtapaChange(); }
+}
+
+function onEtapaChange() {
+  const linea = document.getElementById('f-linea').value;
+  const etapa = document.getElementById('f-etapa').value;
+  const procesoEl = document.getElementById('f-proceso');
+  procesoEl.innerHTML='<option value="">— Seleccionar —</option>'; procesoEl.disabled=true;
+  resetSS('id'); resetSS('producto');
+  document.getElementById('hint-id').textContent = 'Selecciona etapa primero';
+  document.getElementById('hint-proceso').textContent = 'Selecciona etapa primero';
+  document.getElementById('hint-proceso').classList.remove('ok');
+
+  // Mostrar/ocultar campos condicionales según etapa
+  const isEmpaque = etapa === 'EMPAQUE';
+  const isCoccionEmbutidos = etapa === 'COCCION' && linea === 'EMBUTIDOS';
+  const elEmpaque = document.getElementById('extra-empaque');
+  const elHumo = document.getElementById('extra-humo');
+  const elEquipo = document.getElementById('extra-equipo');
+  if(elEmpaque) elEmpaque.style.display = isEmpaque ? 'block' : 'none';
+  if(elHumo) elHumo.style.display = 'none';
+  if(elEquipo) elEquipo.style.display = 'none';
+
+  if(!etapa) return;
+
+  const prods = BD[linea];
+  const filtered = Object.values(prods).filter(p => p.etapas.includes(etapa))
+                         .sort((a,b)=>Number(a.id)-Number(b.id));
+  populateSS('id', filtered.map(p=>({v:p.id, l:p.id})));
+  populateSS('producto', filtered.map(p=>({v:p.id, l:p.producto})));
+  document.getElementById('hint-id').textContent = `${filtered.length} producto(s) — escribe para filtrar`;
+  if(filtered.length===1){ selectSS('id', filtered[0].id, filtered[0].id); }
+}
+
+function syncProcesos(linea, id, etapa) {
+  document.getElementById('f-id').value = id;
+  document.getElementById('f-producto').value = id;
+  const prod = BD[linea][id];
+  // Get processes for this specific etapa
+  let procs = [];
+  if(prod.procesos && typeof prod.procesos === 'object' && !Array.isArray(prod.procesos)) {
+    procs = prod.procesos[etapa] || [];
+  } else if(Array.isArray(prod.procesos)) {
+    procs = prod.procesos; // fallback for old format
+  }
+  setOpts('f-proceso', procs.map(p=>({v:p,l:p})), '— Proceso —');
+  document.getElementById('f-proceso').disabled = procs.length === 0;
+  const h = document.getElementById('hint-proceso');
+  h.textContent = `${procs.length} proceso(s)`; h.classList.add('ok');
+  if(procs.length===1) document.getElementById('f-proceso').value = procs[0];
+
+  // Auto-calc unidades si es EMPAQUE
+  const factor = prod.factor || 0;
+  if(etapa === 'EMPAQUE' && factor > 0) {
+    document.getElementById('hint-unidades').textContent = `(FC: ${factor})`;
+    calcUnidades();
+  }
+}
+
+function calcUnidades() {
+  const volumen = parseFloat(document.getElementById('f-volumen').value) || 0;
+  const id = document.getElementById('f-id').value;
+  const linea = document.getElementById('f-linea').value;
+  if(!id || !linea || !BD[linea] || !BD[linea][id]) return;
+  const factor = BD[linea][id].factor || 0;
+  const unidades = factor > 0 ? Math.round(volumen / factor) : 0;
+  document.getElementById('f-unidades').value = unidades > 0 ? unidades : '';
+}
+
+function onIdChange() {}
+function onProductoChange() {}
+
+function onProcesoChange() {
+  const proceso = document.getElementById('f-proceso').value;
+  const linea = document.getElementById('f-linea').value;
+  const etapa = document.getElementById('f-etapa').value;
+  const isCoccionEmbutidos = proceso === 'COCCION' && linea === 'EMBUTIDOS';
+  const elHumo = document.getElementById('extra-humo');
+  const elEquipo = document.getElementById('extra-equipo');
+  if(elHumo) elHumo.style.display = isCoccionEmbutidos ? 'block' : 'none';
+  if(elEquipo) elEquipo.style.display = isCoccionEmbutidos ? 'block' : 'none';
+}
+
+// ── TIME MODE ─────────────────────────────────────────────────────────────────
+let timeMode = 'auto'; // 'auto' | 'manual'
+
+function setTimeMode(mode) {
+  timeMode = mode;
+  document.getElementById('btn-mode-auto').classList.toggle('active', mode==='auto');
+  document.getElementById('btn-mode-manual').classList.toggle('active', mode==='manual');
+  document.getElementById('time-auto-block').style.display = mode==='auto' ? 'block' : 'none';
+  document.getElementById('time-manual-block').style.display = mode==='manual' ? 'block' : 'none';
+  document.getElementById('display-dur').textContent = '--:--:--';
+  if(mode==='manual') calcManualDur();
+}
+
+function calcManualDur() {
+  const vi = document.getElementById('f-inicio-manual').value;
+  const vf = document.getElementById('f-fin-manual').value;
+  if(!vi || !vf) { document.getElementById('display-dur').textContent='--:--:--'; return; }
+  const ini = vi.length===5 ? vi+':00' : vi;
+  const fin = vf.length===5 ? vf+':00' : vf;
+  const diff = Math.max(0, durInMin(ini, fin)*60);
+  document.getElementById('display-dur').textContent=`${pad(Math.floor(diff/3600))}:${pad(Math.floor((diff%3600)/60))}:${pad(Math.floor(diff%60))}`;
+}
+
+// ── TIMER (auto) ──────────────────────────────────────────────────────────────
+function setTime(type){
+  const now=new Date();
+  if(type==='inicio'){
+    startTime=now; const e=document.getElementById('display-inicio'); e.textContent=timeStr(now); e.classList.add('filled');
+  } else {
+    if(!startTime){showToast('⚠ Define primero la hora de inicio','#e85050');return;}
+    endTime=now; const e=document.getElementById('display-fin'); e.textContent=timeStr(now); e.classList.add('filled');
+    const diff=Math.max(0,endTime-startTime);
+    document.getElementById('display-dur').textContent=`${pad(Math.floor(diff/3600000))}:${pad(Math.floor((diff%3600000)/60000))}:${pad(Math.floor((diff%60000)/1000))}`;
+  }
+}
+
+// ── BANDEJAS PARALELAS ────────────────────────────────────────────────────────
+const trays = [null, null, null, null]; // null = empty
+let trayTimerInterval = null;
+
+function startTrayTimers() {
+  if(trayTimerInterval) return;
+  trayTimerInterval = setInterval(() => {
+    trays.forEach((t, i) => {
+      if(t && t.state === 'active') {
+        renderTray(i);
+      }
+    });
+  }, 1000);
+}
+
+function trayElapsed(t) {
+  const base = t.elapsed || 0;
+  if(t.state === 'active') {
+    return base + Math.floor((Date.now() - t.resumedAt) / 1000);
+  }
+  return base;
+}
+
+function fmtSec(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+}
+
+function enviarBandeja() {
+  const slot = trays.findIndex(t => t === null);
+  if(slot === -1) { showToast('⚠ Máximo 4 bandejas activas','#dc2626'); return; }
+
+  // Validate form
+  const fechaISO = document.getElementById('f-fecha').value;
+  const linea = document.getElementById('f-linea').value;
+  const id = document.getElementById('f-id').value;
+  const etapa = document.getElementById('f-etapa').value;
+  const proceso = document.getElementById('f-proceso').value;
+  const personas = parseInt(document.getElementById('f-personas').value);
+
+  if(!fechaISO){ showToast('⚠ Selecciona la fecha','#e85050'); return; }
+  if(!linea){ showToast('⚠ Selecciona una línea','#e85050'); return; }
+  if(!id){ showToast('⚠ Selecciona un producto','#e85050'); return; }
+  if(!etapa){ showToast('⚠ Selecciona la etapa','#e85050'); return; }
+  if(!proceso){ showToast('⚠ Selecciona el proceso','#e85050'); return; }
+  if(isNaN(personas)||personas<1){ showToast('⚠ Ingresa N° de personas','#e85050'); return; }
+
+  const now = new Date();
+  trays[slot] = {
+    state: 'active',
+    fechaISO, linea, id,
+    producto: BD[linea][id].producto,
+    etapa, proceso, personas,
+    obs: document.getElementById('f-obs').value.trim(),
+    inicioDate: now,
+    inicioStr: timeStr(now),
+    elapsed: 0,
+    resumedAt: Date.now(),
+  };
+
+  renderTray(slot);
+  startTrayTimers();
+  resetForm();
+  showToast(`▶ Proceso iniciado en bandeja ${slot+1}`);
+}
+
+function trayPause(slot, e) {
+  e.stopPropagation();
+  const t = trays[slot];
+  if(!t || t.state !== 'active') return;
+  t.elapsed += Math.floor((Date.now() - t.resumedAt) / 1000);
+  t.state = 'paused';
+  renderTray(slot);
+}
+
+function trayResume(slot, e) {
+  e.stopPropagation();
+  const t = trays[slot];
+  if(!t || t.state !== 'paused') return;
+  t.state = 'active';
+  t.resumedAt = Date.now();
+  renderTray(slot);
+  startTrayTimers();
+}
+
+function trayFinish(slot, e) {
+  e.stopPropagation();
+  const t = trays[slot];
+  if(!t) return;
+
+  const fin = timeStr(new Date());
+  const volInput = prompt(`Bandeja ${slot+1} — ${t.producto}\nIngresa el volumen (kg):`);
+  const volumen = parseFloat(volInput);
+  if(isNaN(volumen) || volumen < 0) { showToast('⚠ Volumen inválido','#dc2626'); return; }
+
+  const tempInput = prompt(`Temperatura (°C) — dejar vacío si no aplica:`);
+  const temperatura = tempInput ? parseFloat(tempInput) : null;
+
+  const lote = prompt(`N° de Lote — dejar vacío si no aplica:`) || '';
+
+  let merma = null, unidades = null;
+  if(t.etapa === 'EMPAQUE') {
+    const mermaInput = prompt(`Merma (kg):`);
+    merma = mermaInput ? parseFloat(mermaInput) : 0;
+    const factor = BD[t.linea] && BD[t.linea][t.id] ? BD[t.linea][t.id].factor : 0;
+    unidades = factor > 0 ? Math.round(volumen / factor) : null;
+  }
+
+  let humo = null, equipo = '';
+  if(t.etapa === 'COCCION' && t.linea === 'EMBUTIDOS') {
+    const humoInput = prompt(`Humo Líquido (ml):`);
+    humo = humoInput ? parseFloat(humoInput) : 0;
+    equipo = prompt(`Equipo utilizado:\n1. Horno\n2. Marmita\n\nEscribe el nombre:`) || '';
+  }
+
+  const durMin = durInMin(t.inicioStr, fin);
+  const newRecord = {
+    uid: Date.now(), fechaISO: t.fechaISO, fecha: isoToDisplay(t.fechaISO),
+    linea: t.linea, idProd: t.id, producto: t.producto,
+    etapa: t.etapa, proceso: t.proceso,
+    inicio: t.inicioStr, fin, durMin,
+    personas: t.personas, volumen, obs: t.obs,
+    productividad: volumen / (t.personas * Math.max(0.0001, durMin/60)),
+    temperatura, lote, merma, unidades, humo, equipo,
+    maestroNombre: '', maestroVolumen: null
+  };
+
+  records.unshift(newRecord);
+
+  // Maestro de Mesa si es CORTES DE POLLO
+  if(t.linea === 'CORTES DE POLLO') {
+    const maestroNombre = prompt(`Nombre del Maestro de Mesa — dejar vacío si no aplica:`) || '';
+    if(maestroNombre) {
+      const maestroVolInput = prompt(`Volumen del Maestro ${maestroNombre} (kg):`);
+      const maestroVolumen = parseFloat(maestroVolInput) || 0;
+      if(maestroVolumen > 0) {
+        const maestroRecord = {
+          uid: Date.now()+1, fechaISO: t.fechaISO, fecha: isoToDisplay(t.fechaISO),
+          linea: t.linea, idProd: t.id, producto: t.producto,
+          etapa: t.etapa, proceso: t.proceso,
+          inicio: t.inicioStr, fin, durMin, personas: 1,
+          volumen: maestroVolumen, obs: `Maestro: ${maestroNombre}`,
+          productividad: maestroVolumen / Math.max(0.0001, durMin/60),
+          temperatura, lote, merma: null, unidades: null, humo: null,
+          maestroNombre, maestroVolumen: null, esMaestro: true
+        };
+        records.unshift(maestroRecord);
+        gsSave(maestroRecord);
+      }
+    }
+  }
+
+  localStorage.setItem('oregon_v3', JSON.stringify(records));
+  renderTable(); updateStats();
+  gsSave(newRecord);
+
+  trays[slot] = null;
+  renderTray(slot);
+  showToast(`✓ Bandeja ${slot+1} registrada`);
+}
+
+function trayCancel(slot, e) {
+  e.stopPropagation();
+  if(!confirm(`¿Cancelar el proceso en bandeja ${slot+1}?`)) return;
+  trays[slot] = null;
+  renderTray(slot);
+  showToast(`Bandeja ${slot+1} cancelada`);
+}
+
+function trayLoadForm(slot, e) {
+  e && e.stopPropagation();
+  const t = trays[slot];
+  if(!t) return;
+  // Load tray data into form for editing
+  document.getElementById('f-fecha').value = t.fechaISO;
+  const lineaEl = document.getElementById('f-linea');
+  lineaEl.value = t.linea; onLineaChange();
+  setTimeout(() => {
+    const etapaEl = document.getElementById('f-etapa');
+    etapaEl.value = t.etapa; onEtapaChange();
+    setTimeout(() => {
+      selectSS('id', t.id, t.id);
+      document.getElementById('f-proceso').value = t.proceso;
+      document.getElementById('f-personas').value = t.personas;
+      document.getElementById('f-obs').value = t.obs;
+    }, 50);
+  }, 50);
+}
+
+function trayClick(slot) {
+  const t = trays[slot];
+  if(!t) {
+    // Empty tray — scroll to form
+    document.getElementById('panel-form').scrollIntoView({behavior:'smooth', block:'start'});
+    showToast(`Configura el proceso y pulsa "INICIAR en bandeja"`);
+  }
+}
+
+function renderTray(slot) {
+  const el = document.getElementById(`tray-${slot}`);
+  const t = trays[slot];
+  if(!t) {
+    el.className = 'tray empty';
+    el.innerHTML = `<span class="tray-empty-label">+ Nuevo proceso</span><span class="tray-num">${slot+1}</span>`;
+    el.onclick = () => trayClick(slot);
+    return;
+  }
+
+  const elapsed = trayElapsed(t);
+  const stateLabel = t.state === 'active' ? '🟢 Corriendo' : '⏸ Pausado';
+  el.className = `tray ${t.state}`;
+  el.onclick = null;
+  el.innerHTML = `
+    <span class="tray-num">${slot+1}</span>
+    <div class="tray-producto">${t.producto}</div>
+    <div class="tray-meta">${t.linea} · ${t.proceso} · ${t.personas} pers.</div>
+    <div class="tray-timer">${fmtSec(elapsed)}</div>
+    <div class="tray-inicio">${stateLabel} · Inicio: ${t.inicioStr}</div>
+    <div class="tray-actions">
+      ${t.state === 'active'
+        ? `<button class="tray-btn tray-btn-pause" onclick="trayPause(${slot},event)">⏸ Pausar</button>`
+        : `<button class="tray-btn tray-btn-resume" onclick="trayResume(${slot},event)">▶ Reanudar</button>`
+      }
+      <button class="tray-btn tray-btn-finish" onclick="trayFinish(${slot},event)">■ Terminar</button>
+      <button class="tray-btn tray-btn-cancel" onclick="trayCancel(${slot},event)">✕</button>
+    </div>`;
+
+  // Update hint
+  const active = trays.filter(t=>t!==null).length;
+  document.getElementById('trays-hint').textContent = active > 0
+    ? `${active} proceso(s) activo(s)`
+    : 'Inicia un proceso y aparecerá aquí';
+}
+
+// ── REGISTER ──────────────────────────────────────────────────────────────────
+function getExtraFields() {
+  const etapa = document.getElementById('f-etapa').value;
+  const linea = document.getElementById('f-linea').value;
+  const proceso = document.getElementById('f-proceso').value;
+  return {
+    temperatura: parseFloat(document.getElementById('f-temperatura').value) || null,
+    lote: document.getElementById('f-lote').value.trim() || '',
+    merma: etapa==='EMPAQUE' ? (parseFloat(document.getElementById('f-merma').value)||0) : null,
+    unidades: etapa==='EMPAQUE' ? (parseInt(document.getElementById('f-unidades').value)||0) : null,
+    maestroNombre: linea==='CORTES DE POLLO' ? document.getElementById('f-maestro-nombre').value.trim() : '',
+    maestroVolumen: linea==='CORTES DE POLLO' ? (parseFloat(document.getElementById('f-maestro-volumen').value)||0) : null,
+    humo: (proceso==='COCCION' && linea==='EMBUTIDOS') ? (parseFloat(document.getElementById('f-humo').value)||0) : null,
+    equipo: (proceso==='COCCION' && linea==='EMBUTIDOS') ? (document.getElementById('f-equipo').value||'') : '',
+  };
+}
+
+function registrar(){
+  const fechaISO=document.getElementById('f-fecha').value;
+  const linea=document.getElementById('f-linea').value, id=document.getElementById('f-id').value;
+  const etapa=document.getElementById('f-etapa').value, proceso=document.getElementById('f-proceso').value;
+  const personas=parseInt(document.getElementById('f-personas').value), volumen=parseFloat(document.getElementById('f-volumen').value);
+  const obs=document.getElementById('f-obs').value.trim();
+  if(!fechaISO){showToast('⚠ Selecciona la fecha','#e85050');return;}
+  if(!linea){showToast('⚠ Selecciona una línea','#e85050');return;}
+  if(!id){showToast('⚠ Selecciona un producto','#e85050');return;}
+  if(!etapa){showToast('⚠ Selecciona la etapa','#e85050');return;}
+  if(!proceso){showToast('⚠ Selecciona el proceso','#e85050');return;}
+
+  // Resolve inicio/fin from mode
+  let inicio, fin;
+  if(timeMode==='auto'){
+    if(!startTime){showToast('⚠ Registra la hora de inicio','#e85050');return;}
+    if(!endTime){showToast('⚠ Registra la hora de fin','#e85050');return;}
+    inicio=timeStr(startTime); fin=timeStr(endTime);
+  } else {
+    const vi=document.getElementById('f-inicio-manual').value;
+    const vf=document.getElementById('f-fin-manual').value;
+    if(!vi){showToast('⚠ Ingresa la hora de inicio','#e85050');return;}
+    if(!vf){showToast('⚠ Ingresa la hora de fin','#e85050');return;}
+    inicio=vi.length===5?vi+':00':vi;
+    fin=vf.length===5?vf+':00':vf;
+  }
+
+  if(isNaN(personas)||personas<1){showToast('⚠ Ingresa N° de personas','#e85050');return;}
+  if(isNaN(volumen)||volumen<0){showToast('⚠ Ingresa el volumen','#e85050');return;}
+
+  const extra = getExtraFields();
+  const durMin = durInMin(inicio,fin);
+  const newRecord = {
+    uid:Date.now(), fechaISO, fecha:isoToDisplay(fechaISO),
+    linea, idProd:id, producto:BD[linea][id].producto,
+    etapa, proceso, inicio, fin, durMin, personas, volumen, obs,
+    productividad: volumen/((personas)*(Math.max(0.0001,durMin)/60)),
+    ...extra
+  };
+  records.unshift(newRecord);
+  localStorage.setItem('oregon_v3',JSON.stringify(records));
+
+  // Registrar Maestro de Mesa como registro separado si tiene volumen
+  if(extra.maestroNombre && extra.maestroVolumen > 0) {
+    const maestroRecord = {
+      uid: Date.now()+1, fechaISO, fecha: isoToDisplay(fechaISO),
+      linea, idProd: id, producto: BD[linea][id].producto,
+      etapa, proceso, inicio, fin, durMin, personas: 1,
+      volumen: extra.maestroVolumen, obs: `Maestro: ${extra.maestroNombre}`,
+      productividad: extra.maestroVolumen / Math.max(0.0001, durMin/60),
+      temperatura: extra.temperatura, lote: extra.lote,
+      merma: null, unidades: null, maestroNombre: extra.maestroNombre, maestroVolumen: null, humo: null,
+      esMaestro: true
+    };
+    records.unshift(maestroRecord);
+    gsSave(maestroRecord);
+  }
+
+  localStorage.setItem('oregon_v3',JSON.stringify(records));
+  renderTable(); updateStats(); resetForm();
+  showToast('✓ Registro guardado');
+  gsSave(newRecord);
+}
+
+function resetForm(){
+  document.getElementById('f-fecha').value=todayISO();
+  ['f-linea','f-id','f-producto','f-etapa','f-proceso'].forEach(i=>document.getElementById(i).value='');
+  ['f-etapa','f-proceso'].forEach(i=>document.getElementById(i).disabled=true);
+  resetSS('id'); resetSS('producto');
+  document.getElementById('f-personas').value='';
+  document.getElementById('f-volumen').value='';
+  document.getElementById('f-obs').value='';
+  document.getElementById('f-temperatura').value='';
+  document.getElementById('f-lote').value='';
+  document.getElementById('f-merma').value='';
+  document.getElementById('f-unidades').value='';
+  document.getElementById('f-maestro-nombre').value='';
+  document.getElementById('f-maestro-volumen').value='';
+  document.getElementById('f-humo').value='';
+  document.getElementById('f-equipo').value='';
+  // Hide conditional fields
+  document.getElementById('extra-empaque').style.display='none';
+  document.getElementById('extra-maestro').style.display='none';
+  document.getElementById('extra-humo').style.display='none';
+  document.getElementById('extra-equipo').style.display='none';
+  document.getElementById('extra-temp-lote').style.display='none';
+  // Reset auto timer
+  startTime=null; endTime=null;
+  ['display-inicio','display-fin'].forEach(i=>{const e=document.getElementById(i);e.textContent='--:--:--';e.classList.remove('filled');});
+  // Reset manual timer
+  document.getElementById('f-inicio-manual').value='';
+  document.getElementById('f-fin-manual').value='';
+  document.getElementById('display-dur').textContent='--:--:--';
+  document.getElementById('hint-id').textContent='Selecciona etapa primero';
+  document.getElementById('hint-etapa').textContent='Selecciona línea primero';
+  document.getElementById('hint-proceso').textContent='Selecciona etapa primero';
+  document.getElementById('hint-proceso').classList.remove('ok');
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────────────
+const lTag={'CORTES DE POLLO':'tag-l1','EMBUTIDOS':'tag-l2'};
+function getFiltered(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const fl=document.getElementById('filter-linea').value;
+  const fd=document.getElementById('filter-fecha').value;
+  let f=records.filter(r=>{
+    const matchQ=[r.fecha,r.linea,r.idProd,r.producto,r.etapa,r.proceso,r.obs||''].join(' ').toLowerCase().includes(q);
+    const matchL=!fl||r.linea===fl;
+    const matchD=!fd||r.fechaISO===fd;
+    return matchQ&&matchL&&matchD;
+  });
+  if(sortKey) f.sort((a,b)=>{const av=typeof a[sortKey]==='string'?a[sortKey].toLowerCase():a[sortKey],bv=typeof b[sortKey]==='string'?b[sortKey].toLowerCase():b[sortKey];return av>bv?sortDir:av<bv?-sortDir:0;});
+  return f;
+}
+function calcProductividad(r) {
+  const durM = parseFloat(durMinutes(r.inicio, r.fin));
+  if(!durM || !r.personas || !r.volumen) return null;
+  return r.volumen / (r.personas * durM / 60);
+}
+function renderTable(){
+  const f=getFiltered();
+  const tb=document.getElementById('table-body');
+  document.getElementById('empty-state').style.display=f.length?'none':'block';
+  tb.innerHTML=f.map(r=>{
+    const prod = calcProductividad(r);
+    const prodStr = prod !== null ? prod.toFixed(3)+' kg/p·h' : '—';
+    const actions = IS_VISOR ? '' : `<div class="row-actions">
+      <button class="btn-edit-row" onclick="openEdit(${r.uid})" title="Editar">✏</button>
+      <button class="btn-delete" onclick="del(${r.uid})" title="Eliminar">✕</button>
+    </div>`;
+    return `<tr>
+    <td><span class="tag tag-date">${r.fecha}</span></td>
+    <td><span class="tag ${lTag[r.linea]||'tag-l1'}">${r.linea}</span></td>
+    <td class="prod-cell" title="${r.producto}">${r.producto}</td>
+    <td class="mono-cell" style="color:var(--text-bright)">${r.proceso}</td>
+    <td class="mono-cell">${r.inicio}</td>
+    <td class="mono-cell">${r.fin}</td>
+    <td><span class="duration-pill">${durLabel(r.inicio,r.fin)}</span></td>
+    <td class="mono-cell" style="text-align:center">${r.personas}</td>
+    <td class="mono-cell" style="color:var(--accent2)">${Number(r.volumen).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
+    <td class="mono-cell" style="color:var(--accent3);font-weight:bold">${prodStr}</td>
+    <td style="color:var(--text-dim);font-size:11px;max-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.obs||'—'}</td>
+    <td>${actions}</td>
+  </tr>`;
+  }).join('');
+}
+
+// ── EDIT ──────────────────────────────────────────────────────────────────────
+let editUID = null;
+
+function openEdit(uid) {
+  const r = records.find(x => x.uid === uid);
+  if(!r) return;
+  editUID = uid;
+  document.getElementById('e-fecha').value = r.fechaISO;
+  document.getElementById('e-linea').value = r.linea;
+  document.getElementById('e-producto').value = r.producto;
+  document.getElementById('e-proceso').value = r.proceso;
+  document.getElementById('e-inicio').value = r.inicio.length===8 ? r.inicio.slice(0,5) : r.inicio;
+  document.getElementById('e-fin').value = r.fin.length===8 ? r.fin.slice(0,5) : r.fin;
+  document.getElementById('e-personas').value = r.personas;
+  document.getElementById('e-volumen').value = r.volumen;
+  document.getElementById('e-obs').value = r.obs || '';
+  updateEditDur();
+  document.getElementById('edit-modal').classList.add('show');
+}
+
+function updateEditDur() {
+  const vi = document.getElementById('e-inicio').value;
+  const vf = document.getElementById('e-fin').value;
+  const personas = parseFloat(document.getElementById('e-personas').value);
+  const volumen = parseFloat(document.getElementById('e-volumen').value);
+  if(!vi || !vf) { document.getElementById('e-dur-preview').textContent = '--:--:-- · — kg/p·h'; return; }
+  const ini = vi.length===5 ? vi+':00' : vi;
+  const fin = vf.length===5 ? vf+':00' : vf;
+  const durSec = Math.max(0, durInMin(ini,fin)*60);
+  const durStr = `${pad(Math.floor(durSec/3600))}:${pad(Math.floor((durSec%3600)/60))}:${pad(Math.floor(durSec%60))}`;
+  const durH = durSec/3600;
+  let prodStr = '— kg/p·h';
+  if(durH > 0 && personas > 0 && volumen >= 0) prodStr = (volumen/(personas*durH)).toFixed(3)+' kg/p·h';
+  document.getElementById('e-dur-preview').textContent = `${durStr} · ${prodStr}`;
+}
+
+function saveEdit() {
+  const idx = records.findIndex(x => x.uid === editUID);
+  if(idx === -1) return;
+  const fechaISO = document.getElementById('e-fecha').value;
+  const vi = document.getElementById('e-inicio').value;
+  const vf = document.getElementById('e-fin').value;
+  const personas = parseInt(document.getElementById('e-personas').value);
+  const volumen = parseFloat(document.getElementById('e-volumen').value);
+  const obs = document.getElementById('e-obs').value.trim();
+  if(!fechaISO){showToast('⚠ Ingresa la fecha','#dc2626');return;}
+  if(!vi||!vf){showToast('⚠ Ingresa las horas','#dc2626');return;}
+  if(isNaN(personas)||personas<1){showToast('⚠ Ingresa N° personas','#dc2626');return;}
+  if(isNaN(volumen)||volumen<0){showToast('⚠ Ingresa el volumen','#dc2626');return;}
+  const inicio = vi.length===5?vi+':00':vi;
+  const fin = vf.length===5?vf+':00':vf;
+  const durH = Math.max(0.0001, durInMin(inicio,fin))/60;
+  records[idx] = { ...records[idx], fechaISO, fecha:isoToDisplay(fechaISO), inicio, fin,
+    durMin:durInMin(inicio,fin), personas, volumen, obs,
+    productividad: volumen/(personas*durH) };
+  localStorage.setItem('oregon_v3', JSON.stringify(records));
+  renderTable(); updateStats();
+  gsSave(records[idx]);
+  closeEditModal();
+  showToast('✓ Registro actualizado');
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('show');
+  editUID = null;
+}
+
+// ── VISOR MODE ────────────────────────────────────────────────────────────────
+const IS_VISOR = new URLSearchParams(window.location.search).get('modo') === 'visor';
+if(IS_VISOR) {
+  document.body.classList.add('visor-mode');
+  document.getElementById('visor-banner').style.display = 'block';
+}
+function sortBy(k){sortKey===k?sortDir*=-1:(sortKey=k,sortDir=1);renderTable();}
+function del(uid){
+  gsDelete(uid);
+  records=records.filter(r=>r.uid!==uid);
+  localStorage.setItem('oregon_v3',JSON.stringify(records));
+  renderTable();updateStats();
+}
+function clearAll(){
+  if(!records.length)return;
+  if(confirm('¿Eliminar todos los registros?')){
+    // Delete each from GS
+    records.forEach(r=>gsDelete(r.uid));
+    records=[];
+    localStorage.setItem('oregon_v3',JSON.stringify(records));
+    renderTable();updateStats();
+  }
+}
+
+function updateStats(){
+  const d=records;
+  document.getElementById('stat-total').textContent=d.length;
+  document.getElementById('stat-personas').textContent=d.reduce((a,r)=>a+r.personas,0);
+  document.getElementById('stat-volumen').textContent=d.reduce((a,r)=>a+r.volumen,0).toLocaleString('es-PE',{maximumFractionDigits:1});
+  document.getElementById('stat-lineas').textContent=new Set(d.map(r=>r.linea)).size;
+}
+
+// ── EXPORT CSV ────────────────────────────────────────────────────────────────
+function exportCSV(){
+  const data=getFiltered();
+  if(!data.length){showToast('⚠ Sin datos para exportar','#e85050');return;}
+  const h=['Fecha','Línea','Producto','Proceso','Hora Inicio','Hora Fin','Duración','Duración (min)','N° Personas','Volumen (kg)','Productividad (kg/p·h)','Observaciones'];
+  const rows=data.map(r=>{
+    const prod=calcProductividad(r);
+    return [r.fecha,r.linea,r.producto,r.proceso,r.inicio,r.fin,durLabel(r.inicio,r.fin),durMinutes(r.inicio,r.fin),r.personas,Number(r.volumen).toFixed(2),prod!==null?prod.toFixed(3):'',r.obs||''];
+  });
+  const csv=[h,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download=`oregon_tiempos_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); showToast('⬇ CSV exportado');
+}
+
+// ── EXPORT EXCEL (SheetJS) ────────────────────────────────────────────────────
+function exportXLSX(){
+  const data=getFiltered();
+  if(!data.length){showToast('⚠ Sin datos para exportar','#e85050');return;}
+
+  const wb = XLSX.utils.book_new();
+
+  // ── Hoja 1: Registros ──────────────────────────────────────────────────────
+  const headers = ['Fecha','Línea de Producción','Producto','Proceso','Hora Inicio','Hora Fin','Duración','Duración (min)','N° Personas','Volumen (kg)','Productividad (kg/p·h)','Observaciones'];
+  const rows = data.map(r=>{
+    const prod=calcProductividad(r);
+    return [
+      r.fecha, r.linea, r.producto, r.proceso,
+      r.inicio, r.fin, durLabel(r.inicio,r.fin), parseFloat(durMinutes(r.inicio,r.fin)),
+      r.personas, parseFloat(Number(r.volumen).toFixed(2)), prod!==null?parseFloat(prod.toFixed(3)):null, r.obs||''
+    ];
+  });
+  const wsData = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Column widths
+  wsData['!cols'] = [
+    {wch:12},{wch:22},{wch:40},{wch:24},
+    {wch:12},{wch:12},{wch:14},{wch:14},{wch:12},{wch:13},{wch:20},{wch:30}
+  ];
+
+  // Header style (dark bg + bold) — note: SheetJS free only supports basic styles
+  const headerStyle = { font:{bold:true,color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1E2332'}}, alignment:{horizontal:'center',vertical:'center'} };
+  headers.forEach((_,ci)=>{
+    const cell = wsData[XLSX.utils.encode_cell({r:0,c:ci})];
+    if(cell) cell.s = headerStyle;
+  });
+
+  // Freeze top row
+  wsData['!freeze'] = {xSplit:0, ySplit:1, topLeftCell:'A2', activePane:'bottomLeft'};
+
+  XLSX.utils.book_append_sheet(wb, wsData, 'Registros');
+
+  // ── Hoja 2: Resumen por Línea ──────────────────────────────────────────────
+  const lineaMap={};
+  data.forEach(r=>{
+    if(!lineaMap[r.linea]) lineaMap[r.linea]={linea:r.linea,registros:0,personas:0,volumen:0,durMin:0};
+    lineaMap[r.linea].registros++;
+    lineaMap[r.linea].personas+=r.personas;
+    lineaMap[r.linea].volumen+=r.volumen;
+    lineaMap[r.linea].durMin+=r.durMin;
+  });
+  const sumHeaders=['Línea','N° Registros','Total Personas','Volumen Total (kg)','Duración Total (min)','Promedio Duración (min)'];
+  const sumRows=Object.values(lineaMap).map(l=>[
+    l.linea, l.registros, l.personas,
+    parseFloat(l.volumen.toFixed(2)),
+    parseFloat(l.durMin.toFixed(1)),
+    parseFloat((l.durMin/l.registros).toFixed(1))
+  ]);
+  const wsSummary = XLSX.utils.aoa_to_sheet([sumHeaders,...sumRows]);
+  wsSummary['!cols']=[{wch:22},{wch:14},{wch:16},{wch:20},{wch:22},{wch:24}];
+  sumHeaders.forEach((_,ci)=>{
+    const cell=wsSummary[XLSX.utils.encode_cell({r:0,c:ci})];
+    if(cell) cell.s={font:{bold:true},fill:{fgColor:{rgb:'E8A020'}},alignment:{horizontal:'center'}};
+  });
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen por Línea');
+
+  // ── Hoja 3: Resumen por Proceso ────────────────────────────────────────────
+  const procMap={};
+  data.forEach(r=>{
+    const key=`${r.linea} | ${r.proceso}`;
+    if(!procMap[key]) procMap[key]={linea:r.linea,proceso:r.proceso,registros:0,personas:0,volumen:0,durMin:0};
+    procMap[key].registros++;
+    procMap[key].personas+=r.personas;
+    procMap[key].volumen+=r.volumen;
+    procMap[key].durMin+=r.durMin;
+  });
+  const procHeaders=['Línea','Proceso','N° Registros','Total Personas','Volumen Total (kg)','Duración Total (min)','Promedio Duración (min)'];
+  const procRows=Object.values(procMap).map(p=>[
+    p.linea,p.proceso,p.registros,p.personas,
+    parseFloat(p.volumen.toFixed(2)),
+    parseFloat(p.durMin.toFixed(1)),
+    parseFloat((p.durMin/p.registros).toFixed(1))
+  ]);
+  const wsProc=XLSX.utils.aoa_to_sheet([procHeaders,...procRows]);
+  wsProc['!cols']=[{wch:22},{wch:24},{wch:14},{wch:16},{wch:20},{wch:22},{wch:24}];
+  procHeaders.forEach((_,ci)=>{
+    const cell=wsProc[XLSX.utils.encode_cell({r:0,c:ci})];
+    if(cell) cell.s={font:{bold:true},fill:{fgColor:{rgb:'3DD68C'}},alignment:{horizontal:'center'}};
+  });
+  XLSX.utils.book_append_sheet(wb, wsProc, 'Resumen por Proceso');
+
+  // ── Descargar ──────────────────────────────────────────────────────────────
+  const filename=`oregon_tiempos_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  showToast('✅ Excel exportado con 3 hojas');
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function showToast(msg,color){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.background=color||'var(--accent2)'; t.style.color=color?'#fff':'#0f1117';
+  t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── EXPORT HTML REPORTE ───────────────────────────────────────────────────────
+function exportHTML() {
+  const data = getFiltered();
+  if(!data.length){showToast('⚠ Sin datos para exportar','#dc2626');return;}
+
+  const fecha = new Date().toLocaleDateString('es-PE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const hora  = new Date().toLocaleTimeString('es-PE');
+  const filtroFecha = document.getElementById('filter-fecha').value;
+  const filtroLinea = document.getElementById('filter-linea').value;
+  const titulo = filtroFecha ? `Reporte ${isoToDisplay(filtroFecha)}` : 'Reporte de Producción';
+
+  // Stats
+  const totalPersonas = data.reduce((a,r)=>a+r.personas,0);
+  const totalVolumen  = data.reduce((a,r)=>a+r.volumen,0).toLocaleString('es-PE',{minimumFractionDigits:2});
+  const lineasSet     = [...new Set(data.map(r=>r.linea))].join(', ');
+  const prodVals      = data.map(r=>calcProductividad(r)).filter(v=>v!==null);
+  const prodProm      = prodVals.length ? (prodVals.reduce((a,v)=>a+v,0)/prodVals.length).toFixed(3) : '—';
+
+  const lTagColors = {'CORTES DE POLLO':'#92400e;background:#fef3c7;border:1px solid #fcd34d','EMBUTIDOS':'#065f46;background:#d1fae5;border:1px solid #6ee7b7'};
+
+  const rows = data.map(r=>{
+    const prod = calcProductividad(r);
+    const prodStr = prod !== null ? prod.toFixed(3) : '—';
+    const lStyle = lTagColors[r.linea] || 'color:#92400e;background:#fef3c7';
+    return `<tr>
+      <td>${r.fecha}</td>
+      <td><span style="padding:2px 7px;border-radius:3px;font-size:11px;font-weight:bold;${lStyle}">${r.linea}</span></td>
+      <td>${r.producto}</td>
+      <td>${r.proceso}</td>
+      <td>${r.inicio}</td>
+      <td>${r.fin}</td>
+      <td>${durLabel(r.inicio,r.fin)}</td>
+      <td style="text-align:center">${r.personas}</td>
+      <td style="text-align:right">${Number(r.volumen).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
+      <td style="text-align:right;font-weight:bold;color:#2563eb">${prodStr}</td>
+      <td style="color:#888;font-size:11px">${r.obs||'—'}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oregon Foods — ${titulo}</title>
+<style>
+  body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:0;background:#f4faf6;color:#1a2e1f}
+  .header{background:#1a7a3f;color:#fff;padding:20px 28px;display:flex;align-items:center;justify-content:space-between}
+  .header-title{font-size:22px;font-weight:900;letter-spacing:2px;text-transform:uppercase}
+  .header-sub{font-size:12px;opacity:.75;margin-top:4px}
+  .header-meta{text-align:right;font-size:12px;opacity:.8;line-height:1.7}
+  .badge-visor{display:inline-block;background:#f59e0b;color:#000;padding:2px 10px;border-radius:3px;font-size:10px;font-weight:bold;margin-left:8px;vertical-align:middle}
+  .stats{display:flex;gap:14px;padding:18px 28px;background:#fff;border-bottom:1px solid #b2dfc5;flex-wrap:wrap}
+  .stat{background:#f0faf4;border:1px solid #b2dfc5;border-radius:8px;padding:12px 18px;min-width:120px}
+  .stat-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#5a7a65;margin-bottom:4px}
+  .stat-value{font-size:22px;font-weight:900;color:#1a7a3f}
+  .filtros{padding:10px 28px;background:#fafff6;border-bottom:1px solid #b2dfc5;font-size:12px;color:#5a7a65}
+  .table-wrap{padding:20px 28px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12px;min-width:700px}
+  thead th{background:#1a7a3f;color:#fff;padding:10px 12px;text-align:left;font-size:11px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+  tbody tr{border-bottom:1px solid #daeee4}
+  tbody tr:nth-child(even){background:#f7fdf9}
+  tbody tr:hover{background:#e8f7ee}
+  tbody td{padding:9px 12px;vertical-align:middle}
+  .footer{text-align:center;padding:16px;font-size:11px;color:#5a7a65;border-top:1px solid #b2dfc5}
+  @media(max-width:600px){.stats{flex-direction:column}.header{flex-direction:column;gap:8px;text-align:center}.header-meta{text-align:center}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="header-title">🌿 Oregon Foods <span class="badge-visor">SOLO LECTURA</span></div>
+    <div class="header-sub">Control de Tiempos de Producción — ${titulo}</div>
+  </div>
+  <div class="header-meta">
+    Generado: ${fecha}<br>${hora}${filtroLinea ? '<br>Línea: '+filtroLinea : ''}
+  </div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-label">Registros</div><div class="stat-value">${data.length}</div></div>
+  <div class="stat"><div class="stat-label">Total Personas</div><div class="stat-value">${totalPersonas}</div></div>
+  <div class="stat"><div class="stat-label">Volumen (kg)</div><div class="stat-value">${totalVolumen}</div></div>
+  <div class="stat"><div class="stat-label">Líneas</div><div class="stat-value" style="font-size:13px;padding-top:4px">${lineasSet}</div></div>
+  <div class="stat"><div class="stat-label">Productiv. prom.</div><div class="stat-value" style="color:#2563eb">${prodProm}${prodVals.length?'<span style="font-size:12px;font-weight:normal"> kg/p·h</span>':''}</div></div>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr>
+    <th>Fecha</th><th>Línea</th><th>Producto</th><th>Proceso</th>
+    <th>Inicio</th><th>Fin</th><th>Duración</th>
+    <th style="text-align:center">Pers.</th>
+    <th style="text-align:right">Vol. kg</th>
+    <th style="text-align:right">Productiv.</th>
+    <th>Obs.</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</div>
+<div class="footer">Oregon Foods — Reporte generado el ${fecha} a las ${hora} · Solo lectura</div>
+</body></html>`;
+
+  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  const a = document.createElement('a');
+  const dateStr = filtroFecha || new Date().toISOString().slice(0,10);
+  a.href = URL.createObjectURL(blob);
+  a.download = `oregon_reporte_${dateStr}.html`;
+  a.click();
+  showToast('✅ Reporte HTML generado — listo para compartir');
+}
+
+// ── PANEL NAV (pantallas angostas) ───────────────────────────────────────────
+function navTo(panel) {
+  const form = document.getElementById('panel-form');
+  const tabla = document.getElementById('panel-tabla');
+  const btnForm = document.getElementById('nav-form');
+  const btnTabla = document.getElementById('nav-tabla');
+  if(panel === 'form') {
+    form.style.display = ''; tabla.style.display = 'none';
+    btnForm.classList.add('active'); btnTabla.classList.remove('active');
+  } else {
+    form.style.display = 'none'; tabla.style.display = '';
+    btnTabla.classList.add('active'); btnForm.classList.remove('active');
+  }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function initNav() {
+  if(window.innerWidth <= 1150 && !document.body.classList.contains('visor-mode')) {
+    document.getElementById('panel-tabla').style.display = 'none';
+  }
+}
+window.addEventListener('resize', () => {
+  if(window.innerWidth > 1150) {
+    document.getElementById('panel-form').style.display = '';
+    document.getElementById('panel-tabla').style.display = '';
+  }
+});
+initNav();
+renderTable(); updateStats();
+
+// Cargar desde Google Sheets al iniciar y cada 30 segundos
+setSyncStatus('syncing');
+loadBDFromSheets();
+gsLoadAll();
+setInterval(gsLoadAll, 30000);
+
+// ── BACKUP AUTOMÁTICO ─────────────────────────────────────────────────────────
+function doBackup() {
+  if(!records.length) return;
+  const fecha = new Date().toISOString().slice(0,10);
+  const hora  = new Date().toTimeString().slice(0,8).replace(/:/g,'-');
+  const payload = JSON.stringify({ version:'oregon_v3', exportado: new Date().toISOString(), registros: records }, null, 2);
+  const blob = new Blob([payload], {type:'application/json;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `oregon_backup_${fecha}_${hora}.json`;
+  a.click();
+}
+
+// Backup al cerrar / recargar la página
+window.addEventListener('beforeunload', (e) => {
+  if(!records.length || IS_VISOR) return;
+  doBackup();
+  // Mensaje estándar del navegador (algunos lo muestran, otros no)
+  e.preventDefault();
+  e.returnValue = '';
+});
+</script>
+</body>
+</html>
